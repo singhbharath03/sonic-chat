@@ -3,7 +3,7 @@ version: "3.8"
 services:
   django:
     build:
-      dockerfile: .backend/Dockerfile
+      dockerfile: ./backend/Dockerfile
     volumes:
       - ./backend:/app
       - ./config:/config
