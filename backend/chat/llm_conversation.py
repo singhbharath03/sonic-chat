@@ -1,7 +1,9 @@
 import os
-import asyncio
 from typing import List
 from groq import AsyncGroq
+
+from chaindata.active_chains import get_active_chains
+from chaindata.constants import IntChainId
 
 client = AsyncGroq(
     api_key=os.environ.get("GROQ_API_KEY"),
@@ -124,4 +126,5 @@ async def get_completion(messages: List[dict], tools: List[dict]) -> str:
 
 
 async def is_user_wallet_funded(wallet_address: str) -> List[str]:
-    return ["Solana", "Sonic"]
+    active_chains = await get_active_chains(wallet_address)
+    return [IntChainId.get_str(chain_id) for chain_id in active_chains]
