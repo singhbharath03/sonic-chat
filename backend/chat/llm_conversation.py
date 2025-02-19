@@ -2,6 +2,7 @@ import os
 from typing import List
 from groq import AsyncGroq
 
+from chat.typing import Message_
 from chaindata.active_chains import get_active_chains
 from chaindata.constants import IntChainId
 
@@ -25,70 +26,65 @@ Steps to onboard a user:
 4. If any chain other than Sonic was funded, bridge those assets to Sonic chain. 
 """
 
+NEW_THREAD_START_MESSAGES = [
+    {
+        "role": "system",
+        "content": SYSTEM_PROMPT,
+    },
+    {
+        "role": "assistant",
+        "content": "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Solana or Sonic chain.",
+    },
+]
 
-async def process_chat(wallet_address: str) -> None:
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT,
-        },
-        {
-            "role": "assistant",
-            "content": "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Solana or Sonic chain.",
-        },
-    ]
 
-    while True:
-        user_input = input("You: ")
-        if user_input.lower() in ["quit", "exit", "bye"]:
-            break
+async def process_chat(messages: List[Message_]) -> List[Message_]:
+    chat_completion = await get_completion(messages)
+    response = chat_completion.choices[0].message
 
-        messages.append({"role": "user", "content": user_input})
+    # TODO: Handle tool calls
 
-        chat_completion = await get_completion(messages)
+    # Handle tool calls if present
+    if response.tool_calls:
+        # Add assistant's response with tool calls to messages
+        messages.append(
+            {
+                "role": "assistant",
+                "content": response.content,
+                "tool_calls": response.tool_calls,
+            }
+        )
 
-        response = chat_completion.choices[0].message
+        tools_responses = []
+        for tool_call in response.tool_calls:
+            function_name = tool_call.function.name
 
-        # Handle tool calls if present
-        if response.tool_calls:
-            # Add assistant's response with tool calls to messages
-            messages.append(
+            # Call the appropriate function
+            if function_name == "is_user_wallet_funded":
+                result = await is_user_wallet_funded(wallet_address)
+            elif function_name == "bridge_assets":
+                result = (
+                    "Assets bridged successfully"  # Implement actual bridging logic
+                )
+
+            # Add the function response to messages
+            tools_responses.append(
                 {
-                    "role": "assistant",
-                    "content": response.content,
-                    "tool_calls": response.tool_calls,
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": function_name,
+                    "content": str(result),
                 }
             )
 
-            tools_responses = []
-            for tool_call in response.tool_calls:
-                function_name = tool_call.function.name
+        messages.extend(tools_responses)
+        # Get a new response from the assistant with the tool results
+        chat_completion = await get_completion(messages)
+        response = chat_completion.choices[0].message
 
-                # Call the appropriate function
-                if function_name == "is_user_wallet_funded":
-                    result = await is_user_wallet_funded(wallet_address)
-                elif function_name == "bridge_assets":
-                    result = (
-                        "Assets bridged successfully"  # Implement actual bridging logic
-                    )
+    messages.append({"role": "assistant", "content": response.content})
 
-                # Add the function response to messages
-                tools_responses.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": function_name,
-                        "content": str(result),
-                    }
-                )
-
-            messages.extend(tools_responses)
-            # Get a new response from the assistant with the tool results
-            chat_completion = await get_completion(messages)
-            response = chat_completion.choices[0].message
-
-        assistant_response = response.content
-        messages.append({"role": "assistant", "content": assistant_response})
+    return messages
 
 
 async def get_completion(messages: List[dict]) -> str:
