@@ -3,6 +3,8 @@ from functools import lru_cache
 
 from django.db import models
 
+SONIC_CHAIN_ID = 146
+
 
 class BaseIntEnum(models.IntegerChoices):
     @classmethod
