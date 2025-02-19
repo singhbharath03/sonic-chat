@@ -1,9 +1,7 @@
-import json
-
 from chaindata.constants import SONIC_CHAIN_ID, IntChainId
 from tools.http import req_post
 
-quote_url = "https://api.odos.xyz/sor/quote/v2"
+BASE_URL = "https://api.odos.xyz/sor"
 
 
 async def get_quote(
@@ -40,4 +38,16 @@ async def get_quote(
         "compact": compact,
     }
 
-    return await req_post(quote_url, quote_request_body)
+    return await req_post(f"{BASE_URL}/quote/v2", quote_request_body)
+
+
+async def assemble_transaction(quote_response: dict, user_addr: str):
+    assemble_request_body = {
+        "userAddr": user_addr,
+        "pathId": quote_response[
+            "pathId"
+        ],  # Replace with the pathId from quote response in step 1
+        "simulate": False,  # this can be set to true if the user isn't doing their own estimate gas call for the transaction
+    }
+
+    return await req_post(f"{BASE_URL}/assemble", assemble_request_body)
