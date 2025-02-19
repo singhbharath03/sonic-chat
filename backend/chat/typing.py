@@ -1,11 +1,11 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 
 class Message_(BaseModel):
     role: str
-    content: str
+    content: Optional[str] = None
 
 
 class ChatResponse_(BaseModel):

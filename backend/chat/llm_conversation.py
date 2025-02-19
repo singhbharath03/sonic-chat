@@ -2,6 +2,7 @@ import os
 from typing import List
 from groq import AsyncGroq
 
+from tools.typing import UserDetails
 from chat.typing import Message_
 from chaindata.active_chains import get_active_chains
 from chaindata.constants import IntChainId
@@ -33,12 +34,14 @@ NEW_THREAD_START_MESSAGES = [
     },
     {
         "role": "assistant",
-        "content": "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Solana or Sonic chain.",
+        "content": "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Base or Sonic chain.",
     },
 ]
 
 
-async def process_chat(messages: List[Message_]) -> List[Message_]:
+async def process_chat(
+    messages: List[Message_], user_details: UserDetails
+) -> List[Message_]:
     chat_completion = await get_completion(messages)
     response = chat_completion.choices[0].message
 
@@ -61,7 +64,7 @@ async def process_chat(messages: List[Message_]) -> List[Message_]:
 
             # Call the appropriate function
             if function_name == "is_user_wallet_funded":
-                result = await is_user_wallet_funded(wallet_address)
+                result = await is_user_wallet_funded(user_details)
             elif function_name == "bridge_assets":
                 result = (
                     "Assets bridged successfully"  # Implement actual bridging logic
@@ -121,6 +124,6 @@ async def get_completion(messages: List[dict]) -> str:
     )
 
 
-async def is_user_wallet_funded(wallet_address: str) -> List[str]:
-    active_chains = await get_active_chains(wallet_address)
+async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
+    active_chains = await get_active_chains(user_details.evm_wallet_address)
     return [IntChainId.get_str(chain_id) for chain_id in active_chains]
