@@ -38,31 +38,6 @@ async def process_chat(wallet_address: str) -> None:
         },
     ]
 
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "is_user_wallet_funded",
-                "description": "Check if the user has funded their wallet.",
-                "parameters": {},
-                "returns": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of funded chains",
-                },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "bridge_assets",
-                "description": "Bridge assets from any chain to Sonic chain.",
-                "parameters": {},
-                "returns": "string",
-            },
-        },
-    ]
-
     while True:
         user_input = input("You: ")
         if user_input.lower() in ["quit", "exit", "bye"]:
@@ -70,7 +45,7 @@ async def process_chat(wallet_address: str) -> None:
 
         messages.append({"role": "user", "content": user_input})
 
-        chat_completion = await get_completion(messages, tools)
+        chat_completion = await get_completion(messages)
 
         response = chat_completion.choices[0].message
 
@@ -109,14 +84,39 @@ async def process_chat(wallet_address: str) -> None:
 
             messages.extend(tools_responses)
             # Get a new response from the assistant with the tool results
-            chat_completion = await get_completion(messages, tools)
+            chat_completion = await get_completion(messages)
             response = chat_completion.choices[0].message
 
         assistant_response = response.content
         messages.append({"role": "assistant", "content": assistant_response})
 
 
-async def get_completion(messages: List[dict], tools: List[dict]) -> str:
+async def get_completion(messages: List[dict]) -> str:
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "is_user_wallet_funded",
+                "description": "Check if the user has funded their wallet.",
+                "parameters": {},
+                "returns": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of funded chains",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "bridge_assets",
+                "description": "Bridge assets from any chain to Sonic chain.",
+                "parameters": {},
+                "returns": "string",
+            },
+        },
+    ]
+
     return await client.chat.completions.create(
         messages=messages,
         model=MODEL,
