@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from typing import List, Any
 from groq import AsyncGroq
@@ -56,13 +57,21 @@ async def complete_conversation(
     while conversation.messages[-1].get("tool_calls"):
         tools_responses = []
         for tool_call in conversation.messages[-1].get("tool_calls"):
-            print("tool call", tool_call)
             try:
                 function_name = get_from_dict(tool_call, ["function", "name"])
-                fn_args = get_from_dict(tool_call, ["function", "arguments"])
+                fn_args = json.loads(
+                    get_from_dict(tool_call, ["function", "arguments"])
+                )
                 # Call the appropriate function
                 if function_name == "is_user_wallet_funded":
                     result = await is_user_wallet_funded(user_details)
+                elif function_name == "swap_tokens":
+                    result = await swap_tokens(
+                        user_details.evm_wallet_address,
+                        fn_args["input_token_symbol"],
+                        fn_args["input_token_amount"],
+                        fn_args["output_token_symbol"],
+                    )
                 elif function_name == "bridge_assets":
                     result = (
                         "Assets bridged successfully"  # Implement actual bridging logic
@@ -118,6 +127,30 @@ async def get_completion(conversation: Conversation) -> None:
         {
             "type": "function",
             "function": {
+                "name": "swap_tokens",
+                "description": "Builds a transaction to swap tokens.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "input_token_symbol": {"type": "string"},
+                        "input_token_amount": {"type": "number"},
+                        "output_token_symbol": {"type": "string"},
+                    },
+                    "required": [
+                        "input_token_symbol",
+                        "input_token_amount",
+                        "output_token_symbol",
+                    ],
+                },
+                "returns": {
+                    "type": "object",
+                    "description": "Swap transaction details",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "bridge_assets",
                 "description": "Bridge assets from any chain to Sonic chain.",
                 "parameters": {},
@@ -146,3 +179,37 @@ async def get_completion(conversation: Conversation) -> None:
 async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
     active_chains = await get_active_chains(user_details.evm_wallet_address)
     return [IntChainId.get_str(chain_id) for chain_id in active_chains]
+
+
+async def swap_tokens(
+    user_address: str,
+    input_token_symbol: str,
+    input_token_amount: float,
+    output_token_symbol: str,
+) -> dict:
+    token_address_by_symbol = await get_token_addresses_from_symbols(
+        [input_token_symbol, output_token_symbol]
+    )
+
+    input_token_address = token_address_by_symbol.get(input_token_symbol)
+    if input_token_address is None:
+        return f"Error: Token {input_token_symbol} not supported"
+
+    output_token_address = token_address_by_symbol.get(output_token_symbol)
+    if output_token_address is None:
+        return f"Error: Token {output_token_symbol} not supported"
+
+    token_metadata = await get_token_metadata([input_token_address])
+    if metadata := token_metadata.get(input_token_address):
+        input_token_decimals = metadata.decimals
+    else:
+        logger.warning(f"Token {input_token_address} not found in token metadata")
+        input_token_decimals = 18
+
+    return await build_swap_transaction(
+        IntChainId.Sonic,
+        input_token_address,
+        input_token_amount * 10**input_token_decimals,
+        output_token_address,
+        user_address,
+    )

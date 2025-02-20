@@ -1,10 +1,29 @@
 import logging
+from typing import Dict, List
 
 from tools.http import req_get
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_LISTS_CACHE = None
+
+
+async def get_token_addresses_from_symbols(symbols: List[str]) -> Dict[str, str]:
+    # TODO: Handle symbols by chain
+
+    token_list = await get_token_lists()
+
+    # Hardcode native token for sonic chain
+    token_list.append(
+        {
+            "name": "Sonic",
+            "symbol": "S",
+            "address": "0x0000000000000000000000000000000000000000",
+            "decimals": 18,
+        }
+    )
+
+    return {token["symbol"]: token["address"] for token in token_list}
 
 
 async def get_token_lists():
