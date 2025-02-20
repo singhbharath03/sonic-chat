@@ -22,7 +22,7 @@ async def get_quote(
         "inputTokens": [
             {
                 "tokenAddress": input_token_address,
-                "amount": str(input_token_amount),
+                "amount": str(int(float(input_token_amount))),
             }
         ],
         "outputTokens": [
@@ -41,7 +41,21 @@ async def get_quote(
     return await req_post(f"{BASE_URL}/quote/v2", quote_request_body)
 
 
-async def assemble_transaction(quote_response: dict, user_addr: str):
+async def build_swap_transaction(
+    chain_id: IntChainId,
+    input_token_address: str,
+    input_token_amount: int,
+    output_token_address: str,
+    user_addr: str,
+):
+    quote_response = await get_quote(
+        chain_id,
+        input_token_address,
+        input_token_amount,
+        output_token_address,
+        user_addr,
+    )
+
     assemble_request_body = {
         "userAddr": user_addr,
         "pathId": quote_response[
