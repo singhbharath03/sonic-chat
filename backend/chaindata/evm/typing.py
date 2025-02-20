@@ -9,3 +9,12 @@ class TokenMetadata_(BaseModel):
     decimals: Optional[int] = None
     logo_url: Optional[str] = None
     total_supply: Optional[float] = None
+
+
+class TokenHolding(BaseModel):
+    token_address: str
+    balance: float
+    name: str
+    symbol: str
+    decimals: int
+    logo_url: Optional[str] = None

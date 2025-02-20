@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 
+from chaindata.evm.token_balances import TokenHolding, get_sonic_token_holdings
 from chat.models import Conversation
 from tools.privy import get_user_profile
 from chat.typing import (
@@ -20,11 +21,6 @@ from fastapi import APIRouter, Request, HTTPException
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-@router.post("/test/")
-async def test(request: Request):
-    return {"message": "Hello, World!"}
 
 
 @router.post("/process_messages/")
@@ -90,3 +86,14 @@ async def submit_transaction(
         messages=conversation.messages,
         needs_txn_signing=False,
     )
+
+
+@router.get(
+    "/sonic_holdings",
+)
+async def get_sonic_holdings(
+    request: Request, privy_user_id: str
+) -> List[TokenHolding]:
+    user_details = await get_user_profile(privy_user_id)
+
+    return await get_sonic_token_holdings(user_details.evm_wallet_address)
