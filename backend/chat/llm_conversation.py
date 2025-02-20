@@ -1,11 +1,18 @@
 import os
-from typing import List
+import logging
+from typing import List, Any
 from groq import AsyncGroq
 
+from tools.dictionary import get_from_dict
+from chat.models import Conversation
+from chaindata.evm.token_metadata import get_token_metadata
+from chaindata.odos import build_swap_transaction
+from chaindata.evm.token_lists import get_token_addresses_from_symbols
 from tools.typing import UserDetails
-from chat.typing import Message_
 from chaindata.active_chains import get_active_chains
 from chaindata.constants import IntChainId
+
+logger = logging.getLogger(__name__)
 
 client = AsyncGroq(
     api_key=os.environ.get("GROQ_API_KEY"),
@@ -39,27 +46,20 @@ NEW_THREAD_START_MESSAGES = [
 ]
 
 
-async def process_chat(
-    messages: List[Message_], user_details: UserDetails
-) -> List[Message_]:
-    chat_completion = await get_completion(messages)
-    response = chat_completion.choices[0].message
+async def complete_conversation(
+    conversation: Conversation,
+    user_details: UserDetails,
+) -> None:
+    await get_completion(conversation)
 
     # Handle tool calls if present
-    while response.tool_calls:
-        # Add assistant's response with tool calls to messages
-        messages.append(
-            {
-                "role": "assistant",
-                "content": response.content,
-                "tool_calls": response.tool_calls,
-            }
-        )
-
+    while conversation.messages[-1].get("tool_calls"):
         tools_responses = []
-        for tool_call in response.tool_calls:
+        for tool_call in conversation.messages[-1].get("tool_calls"):
+            print("tool call", tool_call)
             try:
-                function_name = tool_call.function.name
+                function_name = get_from_dict(tool_call, ["function", "name"])
+                fn_args = get_from_dict(tool_call, ["function", "arguments"])
                 # Call the appropriate function
                 if function_name == "is_user_wallet_funded":
                     result = await is_user_wallet_funded(user_details)
@@ -74,32 +74,33 @@ async def process_chat(
                 tools_responses.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call["id"],
                         "name": function_name,
                         "content": str(result),
                     }
                 )
             except Exception as e:
                 # Add error response for failed tool calls
+                logger.error(f"Error executing {str(e)}")
                 tools_responses.append(
                     {
                         "role": "tool",
-                        "tool_call_id": tool_call.id,
+                        "tool_call_id": tool_call["id"],
                         "name": function_name,
                         "content": f"Error executing {function_name}: {str(e)}",
                     }
                 )
 
-        messages.extend(tools_responses)
+        conversation.messages.extend(tools_responses)
+        await conversation.asave()
+
         # Get a new response from the assistant with the tool results
-        chat_completion = await get_completion(messages)
-        response = chat_completion.choices[0].message
+        await get_completion(conversation)
 
-    messages.append({"role": "assistant", "content": response.content})
-    return messages
+    return
 
 
-async def get_completion(messages: List[dict]) -> str:
+async def get_completion(conversation: Conversation) -> None:
     tools = [
         {
             "type": "function",
@@ -125,12 +126,21 @@ async def get_completion(messages: List[dict]) -> str:
         },
     ]
 
-    return await client.chat.completions.create(
+    # Clean up any messages that might have a 'reasoning' field as they are not supported by groq API
+    messages = [
+        {k: v for k, v in message.items() if k != "reasoning"}
+        for message in conversation.messages
+    ]
+
+    chat_completion_obj = await client.chat.completions.create(
         messages=messages,
         model=MODEL,
         tools=tools,
         tool_choice="auto",
     )
+
+    conversation.messages.append(chat_completion_obj.choices[0].message.to_dict())
+    await conversation.asave()
 
 
 async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
