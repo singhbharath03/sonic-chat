@@ -16,6 +16,7 @@ async def get_token_metadata(token_addresses: List[str]) -> Dict[str, TokenMetad
                 name=token.get("name"),
                 symbol=token.get("symbol"),
                 decimals=token.get("decimals"),
+                logo_url=f"https://raw.githubusercontent.com/Shadow-Exchange/shadow-assets/main/blockchains/sonic/assets/{token['address']}/logo.png",
             )
 
     return metadata_by_mint
