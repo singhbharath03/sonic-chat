@@ -20,3 +20,8 @@ class ProcessMessageRequest_(BaseModel):
 class ConversationResponse_(BaseModel):
     id: UUID
     messages: List[Message_]
+    needs_txn_signing: bool = False
+
+
+class SubmitTransactionRequest_(BaseModel):
+    signed_tx_hash: str

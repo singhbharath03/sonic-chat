@@ -50,7 +50,7 @@ NEW_THREAD_START_MESSAGES = [
 async def complete_conversation(
     conversation: Conversation,
     user_details: UserDetails,
-) -> None:
+) -> bool:
     await get_completion(conversation)
 
     # Handle tool calls if present
@@ -62,6 +62,7 @@ async def complete_conversation(
                 fn_args = json.loads(
                     get_from_dict(tool_call, ["function", "arguments"])
                 )
+
                 # Call the appropriate function
                 if function_name == "is_user_wallet_funded":
                     result = await is_user_wallet_funded(user_details)
@@ -72,6 +73,13 @@ async def complete_conversation(
                         fn_args["input_token_amount"],
                         fn_args["output_token_symbol"],
                     )
+
+                    # If result is a transaction, we need frontend to sign it
+                    if isinstance(result, dict) and result.get("type") == "transaction":
+                        conversation.pending_transaction = result
+                        await conversation.asave()
+                        return True
+
                 elif function_name == "bridge_assets":
                     result = (
                         "Assets bridged successfully"  # Implement actual bridging logic
@@ -106,7 +114,7 @@ async def complete_conversation(
         # Get a new response from the assistant with the tool results
         await get_completion(conversation)
 
-    return
+    return False
 
 
 async def get_completion(conversation: Conversation) -> None:
@@ -206,10 +214,42 @@ async def swap_tokens(
         logger.warning(f"Token {input_token_address} not found in token metadata")
         input_token_decimals = 18
 
-    return await build_swap_transaction(
+    transaction = await build_swap_transaction(
         IntChainId.Sonic,
         input_token_address,
         input_token_amount * 10**input_token_decimals,
         output_token_address,
         user_address,
     )
+
+    return {
+        "type": "transaction",
+        "chain_id": IntChainId.Sonic,
+        "transaction": transaction,
+        "description": f"Swap {input_token_amount} {input_token_symbol} to {output_token_symbol}",
+    }
+
+
+async def submit_signed_transaction(
+    conversation: Conversation, signed_tx_hash: str
+) -> None:
+    """Handle the signed transaction and continue the conversation"""
+    if not conversation.pending_transaction:
+        raise ValueError("No pending transaction found")
+
+    # Add the transaction result to the conversation
+    tools_responses = [
+        {
+            "role": "tool",
+            "tool_call_id": conversation.messages[-1]["tool_calls"][0]["id"],
+            "name": conversation.messages[-1]["tool_calls"][0]["function"]["name"],
+            "content": f"Transaction submitted successfully. Hash: {signed_tx_hash}",
+        }
+    ]
+
+    conversation.messages.extend(tools_responses)
+    conversation.pending_transaction = None
+    await conversation.asave()
+
+    # Continue the conversation
+    await get_completion(conversation)
