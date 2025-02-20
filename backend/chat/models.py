@@ -11,6 +11,7 @@ class Conversation(models.Model):
     messages = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    pending_transaction = models.JSONField(null=True)
 
     def __str__(self):
         return f"Conversation {self.id}"
