@@ -16,7 +16,9 @@ async def get_sonic_token_holdings(user_address: str) -> List[TokenHolding]:
 
     balances, metadata_by_mint = await asyncio.gather(
         get_user_token_balances(user_address, token_addresses),
-        get_token_metadata(token_addresses),
+        get_token_metadata(
+            token_addresses + ["0x0000000000000000000000000000000000000000"]
+        ),  # we always fetch native token balance
     )
 
     return [
@@ -45,18 +47,26 @@ async def get_user_token_balances(
     requests = [
         get_user_token_balance_req(user_address, token_address)
         for token_address in token_addresses
-    ]
+    ] + [get_native_balance_req(user_address)]
 
-    resp = await req_post(SONIC_RPC_URL, requests)
+    responses = await req_post(SONIC_RPC_URL, requests)
 
     balances = {}
-    for token_address, resp in zip(token_addresses, resp):
+    # Handle token balances (all except the last response which is native balance)
+    for token_address, resp in zip(token_addresses, responses[:-1]):
         resp_json = resp["result"]
         if resp_json is None:
             raise ValueError(f"No balance found for token {token_address}")
 
         balance = int(resp_json, 16)
         balances[token_address] = balance
+
+    # Handle native balance (last response)
+    native_resp = responses[-1]
+    if native_resp["result"] is not None:
+        balances["0x0000000000000000000000000000000000000000"] = int(
+            native_resp["result"], 16
+        )
 
     return balances
 
@@ -74,4 +84,13 @@ def get_user_token_balance_req(
             block_id,
         ],
         "id": f"r:{user_address}_{token_address}_{block_id}",
+    }
+
+
+def get_native_balance_req(user_address: str, block_id: str = "latest"):
+    return {
+        "jsonrpc": "2.0",
+        "method": "eth_getBalance",
+        "params": [user_address, block_id],
+        "id": f"{user_address}_{block_id}_get_eth_bal",
     }
