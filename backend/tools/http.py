@@ -2,6 +2,7 @@ import os
 import logging
 import aiohttp
 from aiohttp import ClientTimeout
+import json
 
 from tenacity import (
     retry,
@@ -53,7 +54,12 @@ async def req_get(
             # Raise an error if the response is not ok
             response.raise_for_status()
 
-            return await response.json()
+            try:
+                return await response.json()
+            except aiohttp.ContentTypeError:
+                # If JSON parsing fails, try to parse the text content as JSON
+                text = await response.text()
+                return json.loads(text)
 
 
 @retry(
