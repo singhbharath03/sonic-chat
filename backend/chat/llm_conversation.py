@@ -45,10 +45,8 @@ async def process_chat(
     chat_completion = await get_completion(messages)
     response = chat_completion.choices[0].message
 
-    # TODO: Handle tool calls
-
     # Handle tool calls if present
-    if response.tool_calls:
+    while response.tool_calls:
         # Add assistant's response with tool calls to messages
         messages.append(
             {
@@ -60,25 +58,37 @@ async def process_chat(
 
         tools_responses = []
         for tool_call in response.tool_calls:
-            function_name = tool_call.function.name
+            try:
+                function_name = tool_call.function.name
+                # Call the appropriate function
+                if function_name == "is_user_wallet_funded":
+                    result = await is_user_wallet_funded(user_details)
+                elif function_name == "bridge_assets":
+                    result = (
+                        "Assets bridged successfully"  # Implement actual bridging logic
+                    )
+                else:
+                    result = f"Error: Unknown function '{function_name}'"
 
-            # Call the appropriate function
-            if function_name == "is_user_wallet_funded":
-                result = await is_user_wallet_funded(user_details)
-            elif function_name == "bridge_assets":
-                result = (
-                    "Assets bridged successfully"  # Implement actual bridging logic
+                # Add the function response to messages
+                tools_responses.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": function_name,
+                        "content": str(result),
+                    }
                 )
-
-            # Add the function response to messages
-            tools_responses.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": function_name,
-                    "content": str(result),
-                }
-            )
+            except Exception as e:
+                # Add error response for failed tool calls
+                tools_responses.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": function_name,
+                        "content": f"Error executing {function_name}: {str(e)}",
+                    }
+                )
 
         messages.extend(tools_responses)
         # Get a new response from the assistant with the tool results
@@ -86,7 +96,6 @@ async def process_chat(
         response = chat_completion.choices[0].message
 
     messages.append({"role": "assistant", "content": response.content})
-
     return messages
 
 
