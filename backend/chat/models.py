@@ -2,11 +2,12 @@ import uuid
 
 from django.db import models
 
+from tools.app_model import AppModel
 from chaindata.constants import IntChainId
 from chat.typing import SwapTransactionSteps, TransactionFlows, TransactionStates
 
 
-class Conversation(models.Model):
+class Conversation(AppModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user_id = models.CharField(max_length=255)
     messages = models.JSONField()
@@ -17,7 +18,7 @@ class Conversation(models.Model):
         return f"Conversation {self.id}"
 
 
-class TransactionRequests(models.Model):
+class TransactionRequests(AppModel):
     conversation = models.ForeignKey(
         Conversation, on_delete=models.DO_NOTHING, related_name="transaction_requests"
     )
