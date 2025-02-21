@@ -197,17 +197,24 @@ async def swap_tokens(
     output_token_symbol: str,
 ) -> dict:
     # Called when LLM requests a swap
-    transaction_request = await TransactionRequests.objects.acreate(
-        chain_id=IntChainId.Sonic,
-        conversation=conversation,
-        user_address=user_address,
-        flow=TransactionFlows.SWAP,
-        data={
-            "input_token_symbol": input_token_symbol,
-            "input_token_amount": input_token_amount,
-            "output_token_symbol": output_token_symbol,
-        },
-    )
+    try:
+        transaction_request = await TransactionRequests.objects.aget(
+            conversation=conversation, state=TransactionStates.PROCESSING
+        )
+
+        assert transaction_request.flow == TransactionFlows.SWAP
+    except TransactionRequests.DoesNotExist:
+        transaction_request = await TransactionRequests.objects.acreate(
+            chain_id=IntChainId.Sonic,
+            conversation=conversation,
+            user_address=user_address,
+            flow=TransactionFlows.SWAP,
+            data={
+                "input_token_symbol": input_token_symbol,
+                "input_token_amount": input_token_amount,
+                "output_token_symbol": output_token_symbol,
+            },
+        )
 
     token_address_by_symbol = await get_token_addresses_from_symbols(
         [input_token_symbol, output_token_symbol]
