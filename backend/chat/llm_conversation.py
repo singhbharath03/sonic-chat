@@ -273,12 +273,17 @@ async def submit_signed_transaction(
 
     if transaction_request.state == TransactionStates.COMPLETED:
         # Add the transaction result to the conversation
+        if transaction_request.flow == TransactionFlows.SWAP:
+            content = f"Swap has been completed and verified on the blockchain. Let the user know the same."
+        else:
+            raise ValueError("Unexpected transaction flow")
+
         tools_responses = [
             {
                 "role": "tool",
                 "tool_call_id": conversation.messages[-1]["tool_calls"][0]["id"],
                 "name": conversation.messages[-1]["tool_calls"][0]["function"]["name"],
-                "content": f"Transaction submitted successfully. Hash: {signed_tx_hash}",
+                "content": content,
             }
         ]
         conversation.messages.extend(tools_responses)
