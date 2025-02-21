@@ -78,17 +78,15 @@ async def handle_approval_step(
     ).call()
 
     if allowance < input_token_amount * 10**input_token_decimals:
-        transaction = await build_allowance_transaction(
+        transaction_details = await build_allowance_transaction(
             IntChainId.Sonic,
             user_address,
             input_token_address,
             ODOS_ROUTER_SPENDER_ADDRESS,
+            input_token_symbol,
         )
 
-        transaction_request.transaction_details = {
-            "transaction": transaction,
-            "description": f"Approve {ODOS_ROUTER_SPENDER_ADDRESS} to spend {input_token_symbol} for swap",
-        }
+        transaction_request.transaction_details = transaction_details
         await transaction_request.asave()
         return True
 
@@ -108,18 +106,18 @@ async def handle_swap_step(
 ) -> bool:
     transaction_request.step = SwapTransactionSteps.BUILD_SWAP_TX
 
-    transaction = await build_swap_transaction(
+    transaction_details = await build_swap_transaction(
         IntChainId.Sonic,
         input_token_address,
         input_token_amount * 10**input_token_decimals,
         output_token_address,
         user_address,
     )
+    transaction_details["description"] = (
+        f"Swap {input_token_amount} {input_token_symbol} to {output_token_symbol}"
+    )
 
-    transaction_request.transaction_details = {
-        "transaction": transaction,
-        "description": f"Swap {input_token_amount} {input_token_symbol} to {output_token_symbol}",
-    }
+    transaction_request.transaction_details = transaction_details
     await transaction_request.asave()
     return True
 
@@ -129,9 +127,17 @@ async def build_allowance_transaction(
     user_address: str,
     token_address: str,
     spender_address: str,
+    input_token_symbol: str,
 ) -> Dict:
     w3 = await get_w3(chain_id)
     contract = w3.eth.contract(address=token_address, abi=ABI.ERC20)
-    return await contract.functions.approve(
+    txn = await contract.functions.approve(
         spender_address, 2**256 - 1
     ).build_transaction({"from": user_address})
+
+    return {
+        "transaction": {
+            "transaction": txn,  # multiple nesting to keep it same as odos response
+        },
+        "description": f"Approve {spender_address} to spend {input_token_symbol} for swap",
+    }
