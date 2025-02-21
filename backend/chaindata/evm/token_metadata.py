@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List
 
+from chaindata.constants import SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
 from chaindata.evm.token_lists import get_token_lists
 from chaindata.evm.typing import TokenMetadata_
 
@@ -19,8 +20,8 @@ async def get_token_metadata(token_addresses: List[str]) -> Dict[str, TokenMetad
                 logo_url=f"https://raw.githubusercontent.com/Shadow-Exchange/shadow-assets/main/blockchains/sonic/assets/{token['address']}/logo.png",
             )
 
-    if "0x0000000000000000000000000000000000000000" in token_addresses:
-        metadata_by_mint["0x0000000000000000000000000000000000000000"] = (
+    if SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS in token_addresses:
+        metadata_by_mint[SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS] = (
             get_sonic_token_metadata()
         )
 

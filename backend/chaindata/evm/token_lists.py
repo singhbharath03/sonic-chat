@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List
 
+from chaindata.constants import SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
 from tools.http import req_get
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ async def get_token_addresses_from_symbols(symbols: List[str]) -> Dict[str, str]
         {
             "name": "Sonic",
             "symbol": "S",
-            "address": "0x0000000000000000000000000000000000000000",
+            "address": SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS,
             "decimals": 18,
         }
     )

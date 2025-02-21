@@ -3,6 +3,7 @@ import asyncio
 
 from pydantic import BaseModel
 
+from chaindata.constants import SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
 from chaindata.evm.pricing import get_latest_prices
 from chaindata.evm.typing import TokenHolding, TokenHoldings
 from chaindata.evm.token_metadata import get_token_metadata
@@ -15,7 +16,7 @@ async def get_sonic_token_holdings(user_address: str) -> TokenHoldings:
     token_list = await get_token_lists()
     token_addresses = [token["address"] for token in token_list]
     token_addresses_with_native = token_addresses + [
-        "0x0000000000000000000000000000000000000000"
+        SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
     ]
 
     balances, metadata_by_mint, prices = await asyncio.gather(
@@ -88,7 +89,7 @@ async def get_user_token_balances(
     # Handle native balance (last response)
     native_resp = responses[-1]
     if native_resp["result"] is not None:
-        balances["0x0000000000000000000000000000000000000000"] = int(
+        balances[SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS] = int(
             native_resp["result"], 16
         )
 
