@@ -6,7 +6,7 @@ from chaindata.odos import build_swap_transaction
 from chaindata.evm.token_metadata import get_token_metadata
 from chat.models import TransactionRequests
 from chat.typing import SwapTransactionSteps
-from chaindata.constants import IntChainId
+from chaindata.constants import ODOS_ROUTER_SPENDER_ADDRESS, IntChainId
 import logging
 
 logger = logging.getLogger(__name__)
@@ -74,21 +74,20 @@ async def handle_approval_step(
     w3 = await get_w3(IntChainId.Sonic)
     contract = w3.eth.contract(address=input_token_address, abi=ABI.ERC20)
     allowance = await contract.functions.allowance(
-        user_address, output_token_address
+        user_address, ODOS_ROUTER_SPENDER_ADDRESS
     ).call()
 
     if allowance < input_token_amount * 10**input_token_decimals:
-        spender_address = "0xaC041Df48dF9791B0654f1Dbbf2CC8450C5f2e9D"  # Odos V2 router
         transaction = await build_allowance_transaction(
             IntChainId.Sonic,
             user_address,
             input_token_address,
-            spender_address,
+            ODOS_ROUTER_SPENDER_ADDRESS,
         )
 
         transaction_request.transaction_details = {
             "transaction": transaction,
-            "description": f"Approve {spender_address} to spend {input_token_symbol} for swap",
+            "description": f"Approve {ODOS_ROUTER_SPENDER_ADDRESS} to spend {input_token_symbol} for swap",
         }
         await transaction_request.asave()
         return True

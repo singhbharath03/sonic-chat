@@ -4,6 +4,9 @@ from functools import lru_cache
 from django.db import models
 
 SONIC_CHAIN_ID = 146
+ODOS_ROUTER_SPENDER_ADDRESS = (
+    "0xaC041Df48dF9791B0654f1Dbbf2CC8450C5f2e9D"  # Odos V2 router
+)
 
 
 class BaseIntEnum(models.IntegerChoices):
