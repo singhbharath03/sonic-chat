@@ -143,8 +143,6 @@ async def build_allowance_transaction(
     ).build_transaction({"from": user_address})
 
     return {
-        "transaction": {
-            "transaction": txn,  # multiple nesting to keep it same as odos response
-        },
+        "transaction": txn,
         "description": f"Approve {spender_address} to spend {input_token_symbol} for swap",
     }
