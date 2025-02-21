@@ -4,10 +4,12 @@ import logging
 from typing import List, Any
 from groq import AsyncGroq
 
+from django.db import transaction
+
+from chat.swap_transactions import process_swap_transaction
+from chat.typing import SwapTransactionSteps, TransactionFlows, TransactionStates
 from tools.dictionary import get_from_dict
-from chat.models import Conversation
-from chaindata.evm.token_metadata import get_token_metadata
-from chaindata.odos import build_swap_transaction
+from chat.models import Conversation, TransactionRequests
 from chaindata.evm.token_lists import get_token_addresses_from_symbols
 from tools.typing import UserDetails
 from chaindata.active_chains import get_active_chains
@@ -68,17 +70,14 @@ async def complete_conversation(
                     result = await is_user_wallet_funded(user_details)
                 elif function_name == "swap_tokens":
                     result = await swap_tokens(
+                        conversation,
                         user_details.evm_wallet_address,
                         fn_args["input_token_symbol"],
                         fn_args["input_token_amount"],
                         fn_args["output_token_symbol"],
                     )
 
-                    # If result is a transaction, we need frontend to sign it
-                    if isinstance(result, dict) and result.get("type") == "transaction":
-                        conversation.pending_transaction = result
-                        await conversation.asave()
-                        return True
+                    return True
 
                 elif function_name == "bridge_assets":
                     result = (
@@ -190,66 +189,100 @@ async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
 
 
 async def swap_tokens(
+    conversation: Conversation,
     user_address: str,
     input_token_symbol: str,
     input_token_amount: float,
     output_token_symbol: str,
 ) -> dict:
+    # Called when LLM requests a swap
+    transaction_request = await TransactionRequests.objects.acreate(
+        chain_id=IntChainId.Sonic,
+        conversation=conversation,
+        user_address=user_address,
+        flow=TransactionFlows.SWAP,
+        data={
+            "input_token_symbol": input_token_symbol,
+            "input_token_amount": input_token_amount,
+            "output_token_symbol": output_token_symbol,
+        },
+    )
+
     token_address_by_symbol = await get_token_addresses_from_symbols(
         [input_token_symbol, output_token_symbol]
     )
 
     input_token_address = token_address_by_symbol.get(input_token_symbol)
     if input_token_address is None:
+        transaction_request.failed_reason = f"Token {input_token_symbol} not supported"
+        transaction_request.state = TransactionStates.FAILED
+        await transaction_request.asave()
         return f"Error: Token {input_token_symbol} not supported"
 
     output_token_address = token_address_by_symbol.get(output_token_symbol)
     if output_token_address is None:
+        transaction_request.failed_reason = f"Token {output_token_symbol} not supported"
+        transaction_request.state = TransactionStates.FAILED
+        await transaction_request.asave()
         return f"Error: Token {output_token_symbol} not supported"
 
-    token_metadata = await get_token_metadata([input_token_address])
-    if metadata := token_metadata.get(input_token_address):
-        input_token_decimals = metadata.decimals
-    else:
-        logger.warning(f"Token {input_token_address} not found in token metadata")
-        input_token_decimals = 18
-
-    transaction = await build_swap_transaction(
-        IntChainId.Sonic,
-        input_token_address,
-        input_token_amount * 10**input_token_decimals,
-        output_token_address,
-        user_address,
+    data = transaction_request.data
+    data.update(
+        {
+            "input_token_address": input_token_address,
+            "output_token_address": output_token_address,
+        }
     )
+    transaction_request.data = data
+    await transaction_request.asave()
 
-    return {
-        "type": "transaction",
-        "chain_id": IntChainId.Sonic,
-        "transaction": transaction,
-        "description": f"Swap {input_token_amount} {input_token_symbol} to {output_token_symbol}",
-    }
+    return await process_swap_transaction(transaction_request)
 
 
 async def submit_signed_transaction(
     conversation: Conversation, signed_tx_hash: str
-) -> None:
-    """Handle the signed transaction and continue the conversation"""
-    if not conversation.pending_transaction:
-        raise ValueError("No pending transaction found")
+) -> bool:
+    try:
+        transaction_request = await TransactionRequests.objects.aget(
+            conversation=conversation, state=TransactionStates.PROCESSING
+        )
+    except TransactionRequests.DoesNotExist:
+        raise ValueError("No pending transaction found for conversation")
+    except TransactionRequests.MultipleObjectsReturned:
+        raise ValueError("Multiple pending transactions found for conversation")
 
-    # Add the transaction result to the conversation
-    tools_responses = [
-        {
-            "role": "tool",
-            "tool_call_id": conversation.messages[-1]["tool_calls"][0]["id"],
-            "name": conversation.messages[-1]["tool_calls"][0]["function"]["name"],
-            "content": f"Transaction submitted successfully. Hash: {signed_tx_hash}",
-        }
-    ]
+    transaction_request.transaction_details = None
+    if transaction_request.flow == TransactionFlows.SWAP:
+        from chat.swap_transactions import process_swap_transaction
 
-    conversation.messages.extend(tools_responses)
-    conversation.pending_transaction = None
-    await conversation.asave()
+        if transaction_request.step == SwapTransactionSteps.BUILD_SWAP_TX:
+            transaction_request.state = TransactionStates.COMPLETED
+            transaction_request.step += 1
+        else:
+            await process_swap_transaction(transaction_request)
+    else:
+        raise ValueError("Unexpected transaction flow")
 
-    # Continue the conversation
-    await get_completion(conversation)
+    if transaction_request.state == TransactionStates.COMPLETED:
+        # Add the transaction result to the conversation
+        tools_responses = [
+            {
+                "role": "tool",
+                "tool_call_id": conversation.messages[-1]["tool_calls"][0]["id"],
+                "name": conversation.messages[-1]["tool_calls"][0]["function"]["name"],
+                "content": f"Transaction submitted successfully. Hash: {signed_tx_hash}",
+            }
+        ]
+        conversation.messages.extend(tools_responses)
+
+    with transaction.atomic():
+        await conversation.asave()
+        await transaction_request.asave()
+
+    if transaction_request.state == TransactionStates.COMPLETED:
+        # Continue the conversation
+        await get_completion(conversation)
+
+        return False
+
+    return True

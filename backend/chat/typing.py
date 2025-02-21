@@ -2,6 +2,8 @@ from typing import Any, List, Optional
 from uuid import UUID
 from pydantic import BaseModel
 
+from django.db import models
+
 
 class Message_(BaseModel):
     role: str
@@ -25,3 +27,19 @@ class ConversationResponse_(BaseModel):
 
 class SubmitTransactionRequest_(BaseModel):
     signed_tx_hash: str
+
+
+class SwapTransactionSteps(models.IntegerChoices):
+    # States for Swapping token A to token B
+    APPROVAL_A = 1
+    BUILD_SWAP_TX = 2
+
+
+class TransactionFlows(models.IntegerChoices):
+    SWAP = 0
+
+
+class TransactionStates(models.IntegerChoices):
+    PROCESSING = 0
+    COMPLETED = 1
+    FAILED = 2

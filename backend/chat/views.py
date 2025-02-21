@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from chaindata.evm.typing import TokenHoldings
 from chaindata.evm.token_balances import TokenHolding, get_sonic_token_holdings
-from chat.models import Conversation
+from chat.models import Conversation, TransactionRequests
 from tools.privy import get_user_profile
 from chat.typing import (
     ChatResponse_,
@@ -11,6 +11,7 @@ from chat.typing import (
     Message_,
     ProcessMessageRequest_,
     SubmitTransactionRequest_,
+    TransactionStates,
 )
 from chat.llm_conversation import (
     NEW_THREAD_START_MESSAGES,
@@ -62,10 +63,21 @@ async def get_pending_transaction(request: Request, conversation_id: str):
     except Conversation.DoesNotExist:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    if not conversation.pending_transaction:
-        raise HTTPException(status_code=404, detail="No pending transaction found")
+    try:
+        transaction_request = await TransactionRequests.objects.aget(
+            conversation=conversation, state=TransactionStates.PROCESSING
+        )
+    except TransactionRequests.DoesNotExist:
+        raise HTTPException(
+            status_code=404, detail="No pending transaction found for conversation"
+        )
+    except TransactionRequests.MultipleObjectsReturned:
+        raise HTTPException(
+            status_code=409,
+            detail="Multiple pending transactions found for conversation",
+        )
 
-    return {"transaction_details": conversation.pending_transaction}
+    return {"transaction_details": transaction_request.transaction_details}
 
 
 @router.post(
@@ -80,12 +92,14 @@ async def submit_transaction(
     except Conversation.DoesNotExist:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    await submit_signed_transaction(conversation, request.signed_tx_hash)
+    needs_txn_signing = await submit_signed_transaction(
+        conversation, request.signed_tx_hash
+    )
 
     return ConversationResponse_(
         id=conversation.id,
         messages=conversation.messages,
-        needs_txn_signing=False,
+        needs_txn_signing=needs_txn_signing,
     )
 
 
