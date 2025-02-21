@@ -175,15 +175,28 @@ async def get_completion(conversation: Conversation) -> None:
         for message in conversation.messages
     ]
 
-    chat_completion_obj = await client.chat.completions.create(
-        messages=messages,
-        model=MODEL,
-        tools=tools,
-        tool_choice="auto",
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        chat_completion_obj = await client.chat.completions.create(
+            messages=messages,
+            model=MODEL,
+            tools=tools,
+            tool_choice="auto",
+        )
 
-    conversation.messages.append(chat_completion_obj.choices[0].message.to_dict())
-    await conversation.asave()
+        response = chat_completion_obj.choices[0].message.to_dict()
+
+        # Check if tool call is incorrectly in content
+        if "<tool_call>" in response.get("content", ""):
+            if attempt < max_retries - 1:
+                logger.warning("Tool call found in content, retrying...")
+                continue
+            else:
+                logger.error("Max retries reached for tool call in content")
+
+        conversation.messages.append(response)
+        await conversation.asave()
+        break
 
 
 async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
