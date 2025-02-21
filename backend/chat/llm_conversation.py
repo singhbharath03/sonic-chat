@@ -7,11 +7,10 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
-from chat.swap_transactions import process_swap_transaction
+from chat.swap_transactions import swap_tokens
 from chat.typing import SwapTransactionSteps, TransactionFlows, TransactionStates
 from tools.dictionary import get_from_dict
 from chat.models import Conversation, TransactionRequests
-from chaindata.evm.token_lists import get_token_addresses_from_symbols
 from tools.typing import UserDetails
 from chaindata.active_chains import get_active_chains
 from chaindata.constants import IntChainId
@@ -202,64 +201,6 @@ async def get_completion(conversation: Conversation) -> None:
 async def is_user_wallet_funded(user_details: UserDetails) -> List[str]:
     active_chains = await get_active_chains(user_details.evm_wallet_address)
     return [IntChainId.get_str(chain_id) for chain_id in active_chains]
-
-
-async def swap_tokens(
-    conversation: Conversation,
-    user_address: str,
-    input_token_symbol: str,
-    input_token_amount: float,
-    output_token_symbol: str,
-) -> dict:
-    # Called when LLM requests a swap
-    try:
-        transaction_request = await TransactionRequests.objects.aget(
-            conversation=conversation, state=TransactionStates.PROCESSING
-        )
-
-        assert transaction_request.flow == TransactionFlows.SWAP
-    except TransactionRequests.DoesNotExist:
-        transaction_request = await TransactionRequests.objects.acreate(
-            chain_id=IntChainId.Sonic,
-            conversation=conversation,
-            user_address=user_address,
-            flow=TransactionFlows.SWAP,
-            data={
-                "input_token_symbol": input_token_symbol,
-                "input_token_amount": input_token_amount,
-                "output_token_symbol": output_token_symbol,
-            },
-        )
-
-    token_address_by_symbol = await get_token_addresses_from_symbols(
-        [input_token_symbol, output_token_symbol]
-    )
-
-    input_token_address = token_address_by_symbol.get(input_token_symbol)
-    if input_token_address is None:
-        transaction_request.failed_reason = f"Token {input_token_symbol} not supported"
-        transaction_request.state = TransactionStates.FAILED
-        await transaction_request.asave()
-        return f"Error: Token {input_token_symbol} not supported"
-
-    output_token_address = token_address_by_symbol.get(output_token_symbol)
-    if output_token_address is None:
-        transaction_request.failed_reason = f"Token {output_token_symbol} not supported"
-        transaction_request.state = TransactionStates.FAILED
-        await transaction_request.asave()
-        return f"Error: Token {output_token_symbol} not supported"
-
-    data = transaction_request.data
-    data.update(
-        {
-            "input_token_address": input_token_address,
-            "output_token_address": output_token_address,
-        }
-    )
-    transaction_request.data = data
-    await transaction_request.asave()
-
-    return await process_swap_transaction(transaction_request)
 
 
 async def submit_signed_transaction(
