@@ -11,6 +11,7 @@ from chat.silo_lending_txns import lend_tokens
 from chat.swap_transactions import swap_tokens
 from chat.typing import (
     SiloLendingDepositTxnSteps,
+    SiloLendingWithdrawTxnSteps,
     SwapTransactionSteps,
     TransactionFlows,
     TransactionStates,
@@ -271,6 +272,14 @@ async def submit_signed_transaction(
             transaction_request.step += 1
         else:
             await process_lend_transaction(transaction_request)
+    elif transaction_request.flow == TransactionFlows.SILO_LENDING_WITHDRAW:
+        from chat.silo_lending_txns import process_withdraw_transaction
+
+        if transaction_request.step == SiloLendingWithdrawTxnSteps.WITHDRAW:
+            transaction_request.state = TransactionStates.COMPLETED
+            transaction_request.step += 1
+        else:
+            await process_withdraw_transaction(transaction_request)
     else:
         raise ValueError("Unexpected transaction flow")
 
@@ -280,6 +289,8 @@ async def submit_signed_transaction(
             content = f"Swap has been completed and verified on the blockchain. Let the user know the same."
         elif transaction_request.flow == TransactionFlows.SILO_LENDING_DEPOSIT:
             content = f"Lending transaction has been completed and verified on the blockchain. Let the user know the same."
+        elif transaction_request.flow == TransactionFlows.SILO_LENDING_WITHDRAW:
+            content = f"Withdrawal transaction has been completed and verified on the blockchain. Let the user know the same."
         else:
             raise ValueError("Unexpected transaction flow")
 

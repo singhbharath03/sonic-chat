@@ -40,9 +40,14 @@ class SiloLendingDepositTxnSteps(models.IntegerChoices):
     DEPOSIT = 2
 
 
+class SiloLendingWithdrawTxnSteps(models.IntegerChoices):
+    WITHDRAW = 1
+
+
 class TransactionFlows(models.IntegerChoices):
     SWAP = 0
     SILO_LENDING_DEPOSIT = 1
+    SILO_LENDING_WITHDRAW = 2
 
 
 class TransactionStates(models.IntegerChoices):
