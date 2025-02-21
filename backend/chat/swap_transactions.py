@@ -1,5 +1,7 @@
 from typing import Dict
+import logging
 
+from chat.txn_builder import build_transaction_request
 from chaindata.evm.token_lists import get_token_addresses_from_symbols
 from chaindata.evm.utils import get_w3
 from chaindata.evm.constants import ABI
@@ -12,7 +14,8 @@ from chaindata.constants import (
     SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS,
     IntChainId,
 )
-import logging
+from chat.txn_builder import validate_token
+
 
 logger = logging.getLogger(__name__)
 
@@ -25,42 +28,28 @@ async def swap_tokens(
     output_token_symbol: str,
 ) -> dict:
     # Called when LLM requests a swap
-    try:
-        transaction_request = await TransactionRequests.objects.aget(
-            conversation=conversation, state=TransactionStates.PROCESSING
-        )
-
-        assert transaction_request.flow == TransactionFlows.SWAP
-    except TransactionRequests.DoesNotExist:
-        transaction_request = await TransactionRequests.objects.acreate(
-            chain_id=IntChainId.Sonic,
-            conversation=conversation,
-            user_address=user_address,
-            flow=TransactionFlows.SWAP,
-            data={
-                "input_token_symbol": input_token_symbol,
-                "input_token_amount": input_token_amount,
-                "output_token_symbol": output_token_symbol,
-            },
-        )
-
-    token_address_by_symbol = await get_token_addresses_from_symbols(
-        [input_token_symbol, output_token_symbol]
+    transaction_request = await build_transaction_request(
+        conversation,
+        user_address,
+        TransactionFlows.SWAP,
+        {
+            "input_token_symbol": input_token_symbol,
+            "input_token_amount": input_token_amount,
+            "output_token_symbol": output_token_symbol,
+        },
     )
 
-    input_token_address = token_address_by_symbol.get(input_token_symbol)
-    if input_token_address is None:
-        transaction_request.failed_reason = f"Token {input_token_symbol} not supported"
-        transaction_request.state = TransactionStates.FAILED
-        await transaction_request.asave()
-        return f"Error: Token {input_token_symbol} not supported"
+    input_token_address, error = await validate_token(
+        input_token_symbol, transaction_request
+    )
+    if error:
+        return f"Error: {error}"
 
-    output_token_address = token_address_by_symbol.get(output_token_symbol)
-    if output_token_address is None:
-        transaction_request.failed_reason = f"Token {output_token_symbol} not supported"
-        transaction_request.state = TransactionStates.FAILED
-        await transaction_request.asave()
-        return f"Error: Token {output_token_symbol} not supported"
+    output_token_address, error = await validate_token(
+        output_token_symbol, transaction_request
+    )
+    if error:
+        return f"Error: {error}"
 
     data = transaction_request.data
     data.update(
