@@ -91,5 +91,5 @@ async def build_allowance_transaction(
 
     return {
         "transaction": txn,
-        "description": f"Approve {spender_address} to spend {token_symbol} for lending",
+        "description": f"Approving {spender_address} to spend {token_symbol} for lending",
     }

@@ -161,28 +161,9 @@ async def handle_swap_step(
         user_address,
     )
     transaction_details["description"] = (
-        f"Swap {input_token_amount} {input_token_symbol} to {output_token_symbol}"
+        f"Swapping {input_token_amount} {input_token_symbol} to {output_token_symbol}"
     )
 
     transaction_request.transaction_details = transaction_details
     await transaction_request.asave()
     return True
-
-
-async def build_allowance_transaction(
-    chain_id: IntChainId,
-    user_address: str,
-    token_address: str,
-    spender_address: str,
-    input_token_symbol: str,
-) -> Dict:
-    w3 = await get_w3(chain_id)
-    contract = w3.eth.contract(address=token_address, abi=ABI.ERC20)
-    txn = await contract.functions.approve(
-        spender_address, 2**256 - 1
-    ).build_transaction({"from": user_address})
-
-    return {
-        "transaction": txn,
-        "description": f"Approve {spender_address} to spend {input_token_symbol} for swap",
-    }
