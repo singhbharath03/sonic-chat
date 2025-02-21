@@ -224,7 +224,7 @@ async def handle_lend_step(
     amount_in_wei = int(amount * 10**token_decimals)
 
     txn = await contract.functions.deposit(
-        amount_in_wei, token_address
+        amount_in_wei, user_address
     ).build_transaction({"from": user_address})
 
     transaction_details = {
