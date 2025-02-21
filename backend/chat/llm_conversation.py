@@ -5,6 +5,7 @@ from typing import List, Any
 from groq import AsyncGroq
 
 from django.db import transaction
+from asgiref.sync import sync_to_async
 
 from chat.swap_transactions import process_swap_transaction
 from chat.typing import SwapTransactionSteps, TransactionFlows, TransactionStates
@@ -275,14 +276,18 @@ async def submit_signed_transaction(
         ]
         conversation.messages.extend(tools_responses)
 
-    with transaction.atomic():
-        await conversation.asave()
-        await transaction_request.asave()
+    # Wrap the transaction.atomic() block in sync_to_async
+    @sync_to_async
+    def save_transaction():
+        with transaction.atomic():
+            conversation.save()
+            transaction_request.save()
+
+    await save_transaction()
 
     if transaction_request.state == TransactionStates.COMPLETED:
         # Continue the conversation
         await get_completion(conversation)
-
         return False
 
     return True
