@@ -6,7 +6,11 @@ from chaindata.odos import build_swap_transaction
 from chaindata.evm.token_metadata import get_token_metadata
 from chat.models import TransactionRequests
 from chat.typing import SwapTransactionSteps
-from chaindata.constants import ODOS_ROUTER_SPENDER_ADDRESS, IntChainId
+from chaindata.constants import (
+    ODOS_ROUTER_SPENDER_ADDRESS,
+    SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS,
+    IntChainId,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,6 +74,9 @@ async def handle_approval_step(
 ) -> bool:
     """Handles the approval step of the swap transaction and returns a bool indicating if we need to sign the transaction"""
     transaction_request.step = SwapTransactionSteps.APPROVAL_A
+
+    if input_token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
+        return False
 
     w3 = await get_w3(IntChainId.Sonic)
     contract = w3.eth.contract(address=input_token_address, abi=ABI.ERC20)
