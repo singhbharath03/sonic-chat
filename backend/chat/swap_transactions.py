@@ -1,7 +1,7 @@
 from typing import Dict
 import logging
 
-from chat.txn_builder import build_transaction_request
+from chat.txn_builder import build_transaction_request, check_and_build_allowance
 from chaindata.evm.token_lists import get_token_addresses_from_symbols
 from chaindata.evm.utils import get_w3
 from chaindata.evm.constants import ABI
@@ -123,24 +123,16 @@ async def handle_approval_step(
     """Handles the approval step of the swap transaction and returns a bool indicating if we need to sign the transaction"""
     transaction_request.step = SwapTransactionSteps.APPROVAL_A
 
-    if input_token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
-        return False
+    transaction_details = await check_and_build_allowance(
+        input_token_address,
+        user_address,
+        ODOS_ROUTER_SPENDER_ADDRESS,
+        input_token_amount,
+        input_token_decimals,
+        input_token_symbol,
+    )
 
-    w3 = await get_w3(IntChainId.Sonic)
-    contract = w3.eth.contract(address=input_token_address, abi=ABI.ERC20)
-    allowance = await contract.functions.allowance(
-        user_address, ODOS_ROUTER_SPENDER_ADDRESS
-    ).call()
-
-    if allowance < input_token_amount * 10**input_token_decimals:
-        transaction_details = await build_allowance_transaction(
-            IntChainId.Sonic,
-            user_address,
-            input_token_address,
-            ODOS_ROUTER_SPENDER_ADDRESS,
-            input_token_symbol,
-        )
-
+    if transaction_details:
         transaction_request.transaction_details = transaction_details
         await transaction_request.asave()
         return True

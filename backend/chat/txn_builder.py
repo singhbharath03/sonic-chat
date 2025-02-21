@@ -1,7 +1,9 @@
 from typing import Dict
 
+from chaindata.evm.constants import ABI
+from chaindata.evm.utils import get_w3
 from chaindata.evm.token_lists import get_token_addresses_from_symbols
-from chaindata.constants import IntChainId
+from chaindata.constants import SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS, IntChainId
 from chat.models import Conversation, TransactionRequests
 from chat.typing import TransactionFlows, TransactionStates
 
@@ -45,3 +47,49 @@ async def validate_token(
         return None, error
 
     return token_address, None
+
+
+async def check_and_build_allowance(
+    token_address: str,
+    user_address: str,
+    spender_address: str,
+    amount: float,
+    token_decimals: int,
+    token_symbol: str,
+) -> Dict | None:
+    """Check allowance and build approval transaction if needed"""
+    if token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
+        return None
+
+    w3 = await get_w3(IntChainId.Sonic)
+    contract = w3.eth.contract(address=token_address, abi=ABI.ERC20)
+    allowance = await contract.functions.allowance(user_address, spender_address).call()
+
+    if allowance < amount * 10**token_decimals:
+        return await build_allowance_transaction(
+            IntChainId.Sonic,
+            user_address,
+            token_address,
+            spender_address,
+            token_symbol,
+        )
+    return None
+
+
+async def build_allowance_transaction(
+    chain_id: IntChainId,
+    user_address: str,
+    token_address: str,
+    spender_address: str,
+    token_symbol: str,
+) -> Dict:
+    w3 = await get_w3(chain_id)
+    contract = w3.eth.contract(address=token_address, abi=ABI.ERC20)
+    txn = await contract.functions.approve(
+        spender_address, 2**256 - 1
+    ).build_transaction({"from": user_address})
+
+    return {
+        "transaction": txn,
+        "description": f"Approve {spender_address} to spend {token_symbol} for lending",
+    }
