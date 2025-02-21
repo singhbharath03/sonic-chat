@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -18,3 +18,10 @@ class TokenHolding(BaseModel):
     symbol: str
     decimals: int
     logo_url: Optional[str] = None
+    price: Optional[float] = None
+    usd_value: Optional[float] = None
+
+
+class TokenHoldings(BaseModel):
+    holdings: List[TokenHolding]
+    total_usd_value: float

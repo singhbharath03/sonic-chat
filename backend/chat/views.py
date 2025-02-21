@@ -1,6 +1,7 @@
 import logging
 from typing import List, Optional
 
+from chaindata.evm.typing import TokenHoldings
 from chaindata.evm.token_balances import TokenHolding, get_sonic_token_holdings
 from chat.models import Conversation
 from tools.privy import get_user_profile
@@ -91,9 +92,7 @@ async def submit_transaction(
 @router.get(
     "/sonic_holdings",
 )
-async def get_sonic_holdings(
-    request: Request, privy_user_id: str
-) -> List[TokenHolding]:
+async def get_sonic_holdings(request: Request, privy_user_id: str) -> TokenHoldings:
     user_details = await get_user_profile(privy_user_id)
 
     return await get_sonic_token_holdings(user_details.evm_wallet_address)
