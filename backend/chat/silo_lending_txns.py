@@ -27,7 +27,7 @@ async def lend_tokens(
     transaction_request = await build_transaction_request(
         conversation,
         user_address,
-        TransactionFlows.LEND,
+        TransactionFlows.SILO_LENDING_DEPOSIT,
         {
             "token_symbol": token_symbol,
             "amount": amount,

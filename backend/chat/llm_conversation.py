@@ -7,8 +7,14 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
+from chat.silo_lending_txns import lend_tokens
 from chat.swap_transactions import swap_tokens
-from chat.typing import SwapTransactionSteps, TransactionFlows, TransactionStates
+from chat.typing import (
+    SiloLendingDepositTxnSteps,
+    SwapTransactionSteps,
+    TransactionFlows,
+    TransactionStates,
+)
 from tools.dictionary import get_from_dict
 from chat.models import Conversation, TransactionRequests
 from tools.typing import UserDetails
@@ -37,6 +43,10 @@ Steps to onboard a user:
 2. verify that the user has funded their wallet. 
 3. Let the user know the chains they have funded.
 4. If any chain other than Sonic was funded, bridge those assets to Sonic chain. 
+
+Supported actions:
+- Swap tokens
+- Lend tokens
 """
 
 NEW_THREAD_START_MESSAGES = [
@@ -77,6 +87,16 @@ async def complete_conversation(
                         fn_args["input_token_symbol"],
                         fn_args["input_token_amount"],
                         fn_args["output_token_symbol"],
+                    )
+
+                    return True
+
+                elif function_name == "lend_tokens":
+                    result = await lend_tokens(
+                        conversation,
+                        user_details.evm_wallet_address,
+                        fn_args["token_symbol"],
+                        fn_args["amount"],
                     )
 
                     return True
@@ -130,6 +150,25 @@ async def get_completion(conversation: Conversation) -> None:
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "List of funded chains",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lend_tokens",
+                "description": "Builds a transaction to lend tokens.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "token_symbol": {"type": "string"},
+                        "amount": {"type": "number"},
+                    },
+                    "required": ["token_symbol", "amount"],
+                },
+                "returns": {
+                    "type": "object",
+                    "description": "Lending transaction details",
                 },
             },
         },
@@ -224,6 +263,14 @@ async def submit_signed_transaction(
             transaction_request.step += 1
         else:
             await process_swap_transaction(transaction_request)
+    elif transaction_request.flow == TransactionFlows.SILO_LENDING_DEPOSIT:
+        from chat.silo_lending_txns import process_lend_transaction
+
+        if transaction_request.step == SiloLendingDepositTxnSteps.DEPOSIT:
+            transaction_request.state = TransactionStates.COMPLETED
+            transaction_request.step += 1
+        else:
+            await process_lend_transaction(transaction_request)
     else:
         raise ValueError("Unexpected transaction flow")
 
@@ -231,6 +278,8 @@ async def submit_signed_transaction(
         # Add the transaction result to the conversation
         if transaction_request.flow == TransactionFlows.SWAP:
             content = f"Swap has been completed and verified on the blockchain. Let the user know the same."
+        elif transaction_request.flow == TransactionFlows.SILO_LENDING_DEPOSIT:
+            content = f"Lending transaction has been completed and verified on the blockchain. Let the user know the same."
         else:
             raise ValueError("Unexpected transaction flow")
 
