@@ -35,8 +35,14 @@ class SwapTransactionSteps(models.IntegerChoices):
     BUILD_SWAP_TX = 2
 
 
+class SiloLendingDepositTxnSteps(models.IntegerChoices):
+    APPROVAL = 1
+    DEPOSIT = 2
+
+
 class TransactionFlows(models.IntegerChoices):
     SWAP = 0
+    SILO_LENDING_DEPOSIT = 1
 
 
 class TransactionStates(models.IntegerChoices):
