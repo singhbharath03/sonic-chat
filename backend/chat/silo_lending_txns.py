@@ -78,7 +78,7 @@ async def process_lend_transaction(transaction_request: TransactionRequests) -> 
         if needs_txn_signing:
             return True
 
-    if transaction_request.step < SiloLendingDepositTxnSteps.LEND:
+    if transaction_request.step < SiloLendingDepositTxnSteps.DEPOSIT:
         needs_txn_signing = await handle_lend_step(
             transaction_request,
             lending_vault,
@@ -134,7 +134,7 @@ async def handle_lend_step(
     user_address: str,
 ) -> bool:
     """Handles the lending step of the transaction"""
-    transaction_request.step = SiloLendingDepositTxnSteps.LEND
+    transaction_request.step = SiloLendingDepositTxnSteps.DEPOSIT
 
     w3 = await get_w3(IntChainId.Sonic)
     contract = w3.eth.contract(address=lending_vault, abi=ABI.SILO)
