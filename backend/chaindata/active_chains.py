@@ -3,6 +3,7 @@ import asyncio
 
 from chaindata.constants import ACTIVE_CHAINS, IntChainId
 from chaindata.evm.utils import get_w3
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 async def get_active_chains(wallet_address: str) -> List[str]:
@@ -18,6 +19,9 @@ async def get_active_chains(wallet_address: str) -> List[str]:
     ]
 
 
+@retry(
+    stop=stop_after_attempt(3), wait=wait_exponential(multiplier=0.1, min=0.2, max=1.0)
+)
 async def get_native_balance(chain_id: IntChainId, wallet_address: str) -> int:
     w3 = await get_w3(chain_id)
     balance = await w3.eth.get_balance(wallet_address)
