@@ -21,7 +21,12 @@ from chat.typing import (
     SiloLendingWithdrawTxnSteps,
     TransactionFlows,
 )
-from chaindata.constants import SILO_ROUTER_V2_ADDRESS, IntChainId
+from chaindata.constants import (
+    SILO_ROUTER_V2_ADDRESS,
+    SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS,
+    WRAPPED_SONIC_ADDRESS,
+    IntChainId,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -97,6 +102,15 @@ async def process_withdraw_transaction(
     amount = transaction_request.data.get("amount")
     token_symbol = transaction_request.data.get("token_symbol")
     user_address = transaction_request.user_address
+
+    if token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
+        """
+        NOTE: The router contract of Silo V2 does not support this unwrapping and just withdraws WS to the user.
+        eg tx: https://sonicscan.org/tx/0x0e1b969c97afbd924d48d9f171235e2bce2140f87bc408ee648f137e6808f508
+
+        TODO: Maybe automatically add a step to unwrap the token?
+        """
+        token_address = WRAPPED_SONIC_ADDRESS
 
     token_metadata = await get_token_metadata([token_address])
     if metadata := token_metadata.get(token_address):
