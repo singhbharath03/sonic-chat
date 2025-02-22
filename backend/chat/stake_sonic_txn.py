@@ -52,6 +52,8 @@ async def process_stake_sonic_transaction(
     user_address = transaction_request.user_address
     amount = transaction_request.data["amount"]
 
+    decimal_adjusted_amount = int(amount * (10 ** get_sonic_token_metadata().decimals))
+
     if transaction_request.step < SonicStakeTxnSteps.STAKE:
         w3 = await get_w3(IntChainId.Sonic)
         contract = w3.eth.contract(address=SONIC_FORWARD_PROXY_CONTRACT, abi=ABI.SFC)
@@ -61,7 +63,7 @@ async def process_stake_sonic_transaction(
         ).build_transaction(
             {
                 "from": user_address,
-                "value": amount,
+                "value": decimal_adjusted_amount,
             }
         )
 
