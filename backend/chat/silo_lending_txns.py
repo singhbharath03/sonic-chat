@@ -3,6 +3,8 @@ from typing import Optional
 from aiocache import cached
 from collections import defaultdict
 
+from eth_abi import encode
+
 from tools.dictionary import get_from_dict
 from tools.http import req_post
 from chat.txn_builder import (
@@ -19,7 +21,7 @@ from chat.typing import (
     SiloLendingWithdrawTxnSteps,
     TransactionFlows,
 )
-from chaindata.constants import IntChainId
+from chaindata.constants import SILO_ROUTER_V2_ADDRESS, IntChainId
 import logging
 
 logger = logging.getLogger(__name__)
@@ -237,12 +239,22 @@ async def handle_lend_step(
     transaction_request.step = SiloLendingDepositTxnSteps.DEPOSIT
 
     w3 = await get_w3(IntChainId.Sonic)
-    contract = w3.eth.contract(address=lending_vault, abi=ABI.SILO)
+    contract = w3.eth.contract(address=SILO_ROUTER_V2_ADDRESS, abi=ABI.SILO_ROUTER_ABI)
 
+    # options is a hex string of `amount` + `collateral type` (1) for active lending collateral accruing interest
+    collateral_type = 1
     amount_in_wei = int(amount * 10**token_decimals)
-
-    txn = await contract.functions.deposit(
-        amount_in_wei, user_address
+    encoded = encode(["uint256", "uint8"], [amount_in_wei, collateral_type])
+    options = "0x" + encoded.hex()
+    txn = await contract.functions.execute(
+        [
+            {
+                "actionType": 0,
+                "silo": lending_vault,
+                "asset": token_address,
+                "options": options,
+            }
+        ],
     ).build_transaction({"from": user_address})
 
     transaction_details = {
