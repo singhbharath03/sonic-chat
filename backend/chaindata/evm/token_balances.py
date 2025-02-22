@@ -3,6 +3,7 @@ import asyncio
 
 from pydantic import BaseModel
 
+from tools.display import metric_approx_dv, money_approx_dv
 from chaindata.constants import SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
 from chaindata.evm.pricing import get_latest_prices
 from chaindata.evm.typing import TokenHolding, TokenHoldings
@@ -44,19 +45,19 @@ async def get_sonic_token_holdings(user_address: str) -> TokenHoldings:
         token_holdings.append(
             TokenHolding(
                 token_address=token_address,
-                balance=decimal_adjusted_balance,
+                balance=metric_approx_dv(decimal_adjusted_balance),
                 name=metadata_by_mint[token_address].name,
                 symbol=metadata_by_mint[token_address].symbol,
                 decimals=metadata_by_mint[token_address].decimals,
                 logo_url=metadata_by_mint[token_address].logo_url,
-                price=token_price,
-                usd_value=usd_value,
+                price=metric_approx_dv(token_price),
+                usd_value=money_approx_dv(usd_value),
             )
         )
 
     return TokenHoldings(
         holdings=token_holdings,
-        total_usd_value=total_usd_value,
+        total_usd_value=money_approx_dv(total_usd_value),
     )
 
 
