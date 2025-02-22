@@ -7,11 +7,13 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
+from chat.stake_sonic_txn import stake_sonic
 from chat.silo_lending_txns import lend_tokens, withdraw_all_tokens, withdraw_tokens
 from chat.swap_transactions import swap_tokens
 from chat.typing import (
     SiloLendingDepositTxnSteps,
     SiloLendingWithdrawTxnSteps,
+    SonicStakeTxnSteps,
     SwapTransactionSteps,
     TransactionFlows,
     TransactionStates,
@@ -115,6 +117,13 @@ async def complete_conversation(
                         conversation,
                         user_details.evm_wallet_address,
                         fn_args["token_symbol"],
+                    )
+                    return True
+                elif function_name == "stake_sonic":
+                    result = await stake_sonic(
+                        conversation,
+                        user_details.evm_wallet_address,
+                        fn_args["amount"],
                     )
                     return True
 
@@ -253,6 +262,24 @@ async def get_completion(conversation: Conversation) -> None:
         {
             "type": "function",
             "function": {
+                "name": "stake_sonic",
+                "description": "Builds a transaction to stake SONIC.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "amount": {"type": "number"},
+                    },
+                    "required": ["amount"],
+                },
+                "returns": {
+                    "type": "object",
+                    "description": "Staking transaction details",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "bridge_assets",
                 "description": "Bridge assets from any chain to Sonic chain.",
                 "parameters": {},
@@ -364,6 +391,14 @@ async def submit_signed_transaction(
             transaction_request.step += 1
         else:
             await process_withdraw_transaction(transaction_request)
+    elif transaction_request.flow == TransactionFlows.STAKE_SONIC:
+        from chat.stake_sonic_txn import process_stake_sonic_transaction
+
+        if transaction_request.step == SonicStakeTxnSteps.STAKE:
+            transaction_request.state = TransactionStates.COMPLETED
+            transaction_request.step += 1
+        else:
+            await process_stake_sonic_transaction(transaction_request)
     else:
         raise ValueError("Unexpected transaction flow")
 
@@ -375,6 +410,8 @@ async def submit_signed_transaction(
             content = f"Lending transaction has been completed and verified on the blockchain. Let the user know the same."
         elif transaction_request.flow == TransactionFlows.SILO_LENDING_WITHDRAW:
             content = f"Withdrawal transaction has been completed and verified on the blockchain. Let the user know the same."
+        elif transaction_request.flow == TransactionFlows.STAKE_SONIC:
+            content = f"Staking transaction has been completed and verified on the blockchain. Let the user know the same."
         else:
             raise ValueError("Unexpected transaction flow")
 

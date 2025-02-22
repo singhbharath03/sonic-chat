@@ -44,10 +44,15 @@ class SiloLendingWithdrawTxnSteps(models.IntegerChoices):
     WITHDRAW = 1
 
 
+class SonicStakeTxnSteps(models.IntegerChoices):
+    STAKE = 1
+
+
 class TransactionFlows(models.IntegerChoices):
     SWAP = 0
     SILO_LENDING_DEPOSIT = 1
     SILO_LENDING_WITHDRAW = 2
+    STAKE_SONIC = 3
 
 
 class TransactionStates(models.IntegerChoices):
