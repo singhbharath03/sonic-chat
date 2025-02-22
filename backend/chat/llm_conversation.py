@@ -50,6 +50,7 @@ Steps to onboard a user:
 Supported actions:
 - Swap tokens
 - Lend, withdraw tokens
+- Stake Sonic native token `S`
 """
 
 NEW_THREAD_START_MESSAGES = [
