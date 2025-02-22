@@ -225,13 +225,44 @@ async def get_completion(conversation: Conversation) -> None:
 
         response = chat_completion_obj.choices[0].message.to_dict()
 
-        # Check if tool call is incorrectly in content
-        if "<tool_call>" in response.get("content", ""):
-            if attempt < max_retries - 1:
-                logger.warning("Tool call found in content, retrying...")
-                continue
-            else:
-                logger.error("Max retries reached for tool call in content")
+        # Try to fix malformed tool calls in content
+        content = response.get("content", "")
+        if "<tool_call>" in content:
+            try:
+                # Extract the JSON between <tool_call> and the end delimiter
+                tool_call_start = content.find("<tool_call>") + len("<tool_call>")
+                tool_call_end = content.find("<｜tool▁calls▁end｜>")
+                if tool_call_end == -1:  # Handle case where end delimiter might vary
+                    tool_call_end = content.find("</tool_call>")
+
+                if tool_call_end != -1:
+                    tool_call_json = content[tool_call_start:tool_call_end]
+                    tool_call_data = json.loads(tool_call_json)
+
+                    # Reformat as proper tool calls
+                    response["tool_calls"] = [
+                        {
+                            "id": tool_call_data.get("id", f"call_{attempt}"),
+                            "type": "function",
+                            "function": {
+                                "name": tool_call_data["name"],
+                                "arguments": json.dumps(tool_call_data["arguments"]),
+                            },
+                        }
+                    ]
+                    response["content"] = (
+                        None  # Clear the content since we've extracted the tool call
+                    )
+                    logger.info(
+                        "Successfully extracted and reformatted tool call from content"
+                    )
+
+            except (json.JSONDecodeError, KeyError) as e:
+                logger.error(f"Failed to parse tool call from content: {e}")
+                if attempt < max_retries - 1:
+                    continue
+                else:
+                    logger.error("Max retries reached for malformed tool call")
 
         conversation.messages.append(response)
         await conversation.asave()
