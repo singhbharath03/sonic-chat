@@ -5,13 +5,14 @@ from pydantic import BaseModel
 from django.db import models
 
 
-class Message_(BaseModel):
+class MessageDetails_(BaseModel):
     role: str
     content: Optional[str] = None
+    tx_hash: Optional[str] = None
 
 
 class ChatResponse_(BaseModel):
-    messages: List[Message_]
+    messages: List[MessageDetails_]
 
 
 class ProcessMessageRequest_(BaseModel):
@@ -21,7 +22,7 @@ class ProcessMessageRequest_(BaseModel):
 
 class ConversationResponse_(BaseModel):
     id: UUID
-    messages: List[Message_]
+    messages: List[MessageDetails_]
     needs_txn_signing: bool = False
 
 

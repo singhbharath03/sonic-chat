@@ -8,7 +8,7 @@ from tools.privy import get_user_profile
 from chat.typing import (
     ChatResponse_,
     ConversationResponse_,
-    Message_,
+    MessageDetails_,
     ProcessMessageRequest_,
     SubmitTransactionRequest_,
     TransactionStates,
@@ -39,7 +39,7 @@ async def process_message(
 
     return ConversationResponse_(
         id=conversation.id,
-        messages=conversation.messages,
+        messages=await build_message_details(conversation),
         needs_txn_signing=needs_txn_signing,
     )
 
@@ -50,7 +50,9 @@ async def new_thread(request: Request, privy_user_id: str) -> ConversationRespon
         user_id=privy_user_id, messages=NEW_THREAD_START_MESSAGES
     )
 
-    return ConversationResponse_(id=conversation.id, messages=conversation.messages)
+    return ConversationResponse_(
+        id=conversation.id, messages=await build_message_details(conversation)
+    )
 
 
 @router.get(
@@ -98,7 +100,7 @@ async def submit_transaction(
 
     return ConversationResponse_(
         id=conversation.id,
-        messages=conversation.messages,
+        messages=await build_message_details(conversation),
         needs_txn_signing=needs_txn_signing,
     )
 
@@ -110,3 +112,37 @@ async def get_sonic_holdings(request: Request, privy_user_id: str) -> TokenHoldi
     user_details = await get_user_profile(privy_user_id)
 
     return await get_sonic_token_holdings(user_details.evm_wallet_address)
+
+
+async def build_message_details(conversation: Conversation) -> List[MessageDetails_]:
+    """
+    Transaction requests stores signed txn hash and tool call id. The first assistant message after tool call request should have the txn hash.
+    """
+    signed_txn_hash_by_tool_call_id = {}
+    async for transaction_request in TransactionRequests.objects.filter(
+        conversation=conversation, state=TransactionStates.COMPLETED
+    ):
+        signed_txn_hash_by_tool_call_id[transaction_request.tool_call_id] = (
+            transaction_request.signed_tx_hash
+        )
+
+    tool_call_id = None
+    message_details = []
+    for message in conversation.messages:
+        current_tx_hash = None
+
+        if message.get("tool_calls"):
+            tool_call_id = message["tool_calls"][0]["id"]
+        elif tool_call_id and message["role"] == "assistant":
+            current_tx_hash = signed_txn_hash_by_tool_call_id.get(tool_call_id)
+            tool_call_id = None  # Reset after using it
+
+        message_details.append(
+            MessageDetails_(
+                role=message["role"],
+                content=message.get("content"),
+                tx_hash=current_tx_hash,
+            )
+        )
+
+    return message_details
