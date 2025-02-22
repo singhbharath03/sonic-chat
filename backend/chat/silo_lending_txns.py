@@ -265,7 +265,11 @@ async def handle_lend_step(
             {
                 "actionType": 0,
                 "silo": lending_vault,
-                "asset": token_address,
+                "asset": (
+                    token_address
+                    if token_address != SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS
+                    else WRAPPED_SONIC_ADDRESS
+                ),
                 "options": options,
             }
         ],
