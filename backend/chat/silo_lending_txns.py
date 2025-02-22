@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 from aiocache import cached
 from collections import defaultdict
 
@@ -24,12 +25,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+async def withdraw_all_tokens(
+    conversation: Conversation,
+    user_address: str,
+    token_symbol: str,
+) -> bool:
+    return await withdraw_tokens(conversation, user_address, token_symbol, None)
+
+
 async def withdraw_tokens(
     conversation: Conversation,
     user_address: str,
     token_symbol: str,
-    amount: float,
+    amount: Optional[float] = None,
 ) -> bool:
+    # If amount is not provided, we will withdraw all tokens
     transaction_request = await build_transaction_request(
         conversation,
         user_address,
@@ -115,15 +125,23 @@ async def process_withdraw_transaction(
         return False
 
     if transaction_request.step < SiloLendingWithdrawTxnSteps.WITHDRAW:
-        return await handle_withdraw_step(
-            transaction_request,
-            lending_vault,
-            token_address,
-            amount,
-            token_symbol,
-            token_decimals,
-            user_address,
-        )
+        if amount is None:
+            return await handle_max_withdraw_step(
+                transaction_request,
+                lending_vault,
+                token_symbol,
+                user_address,
+            )
+        else:
+            return await handle_withdraw_step(
+                transaction_request,
+                lending_vault,
+                token_address,
+                amount,
+                token_symbol,
+                token_decimals,
+                user_address,
+            )
 
     return False
 
@@ -254,7 +272,7 @@ async def handle_withdraw_step(
 
     amount_in_wei = int(amount * 10**token_decimals)
 
-    txn = await contract.functions.redeem(
+    txn = await contract.functions.withdraw(
         amount_in_wei, user_address, user_address
     ).build_transaction(
         {
@@ -266,6 +284,39 @@ async def handle_withdraw_step(
     transaction_details = {
         "transaction": txn,
         "description": f"Withdrawing {amount} {token_symbol} from Silo Protocol",
+    }
+
+    transaction_request.transaction_details = transaction_details
+    await transaction_request.asave()
+
+    return True
+
+
+async def handle_max_withdraw_step(
+    transaction_request: TransactionRequests,
+    lending_vault: str,
+    token_symbol: str,
+    user_address: str,
+) -> bool:
+    """Handles the withdraw step of the transaction"""
+    transaction_request.step = SiloLendingWithdrawTxnSteps.WITHDRAW
+
+    w3 = await get_w3(IntChainId.Sonic)
+    contract = w3.eth.contract(address=lending_vault, abi=ABI.SILO)
+
+    max_assets = await contract.functions.maxWithdraw(user_address).call()
+    txn = await contract.functions.withdraw(
+        max_assets, user_address, user_address
+    ).build_transaction(
+        {
+            "from": user_address,
+            "gas": 350000,  # Set a higher minimum gas limit with ~40% buffer
+        }
+    )
+
+    transaction_details = {
+        "transaction": txn,
+        "description": f"Withdrawing all {token_symbol} from Silo Protocol",
     }
 
     transaction_request.transaction_details = transaction_details

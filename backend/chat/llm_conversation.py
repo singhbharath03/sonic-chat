@@ -7,7 +7,7 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
-from chat.silo_lending_txns import lend_tokens, withdraw_tokens
+from chat.silo_lending_txns import lend_tokens, withdraw_all_tokens, withdraw_tokens
 from chat.swap_transactions import swap_tokens
 from chat.typing import (
     SiloLendingDepositTxnSteps,
@@ -110,6 +110,13 @@ async def complete_conversation(
                     )
 
                     return True
+                elif function_name == "withdraw_all_tokens":
+                    result = await withdraw_all_tokens(
+                        conversation,
+                        user_details.evm_wallet_address,
+                        fn_args["token_symbol"],
+                    )
+                    return True
 
                 elif function_name == "bridge_assets":
                     result = (
@@ -194,6 +201,24 @@ async def get_completion(conversation: Conversation) -> None:
                         "amount": {"type": "number"},
                     },
                     "required": ["token_symbol", "amount"],
+                },
+                "returns": {
+                    "type": "object",
+                    "description": "Withdrawal transaction details",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "withdraw_all_tokens",
+                "description": "Builds a transaction to withdraw all tokens.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "token_symbol": {"type": "string"},
+                    },
+                    "required": ["token_symbol"],
                 },
                 "returns": {
                     "type": "object",
