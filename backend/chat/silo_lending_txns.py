@@ -304,9 +304,9 @@ async def handle_max_withdraw_step(
     w3 = await get_w3(IntChainId.Sonic)
     contract = w3.eth.contract(address=lending_vault, abi=ABI.SILO)
 
-    max_assets = await contract.functions.maxWithdraw(user_address).call()
-    txn = await contract.functions.withdraw(
-        max_assets, user_address, user_address
+    max_shares = await contract.functions.maxRedeem(user_address).call()
+    txn = await contract.functions.redeem(
+        max_shares, user_address, user_address
     ).build_transaction(
         {
             "from": user_address,
