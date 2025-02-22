@@ -260,6 +260,11 @@ async def handle_lend_step(
     amount_in_wei = int(amount * 10**token_decimals)
     encoded = encode(["uint256", "uint8"], [amount_in_wei, collateral_type])
     options = "0x" + encoded.hex()
+
+    value_dict = {}
+    if token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
+        value_dict["value"] = amount_in_wei
+
     txn = await contract.functions.execute(
         [
             {
@@ -273,7 +278,7 @@ async def handle_lend_step(
                 "options": options,
             }
         ],
-    ).build_transaction({"from": user_address, "gas": 500000})
+    ).build_transaction({"from": user_address, "gas": 500000, **value_dict})
 
     transaction_details = {
         "transaction": txn,
