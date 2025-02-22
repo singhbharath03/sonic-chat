@@ -145,7 +145,9 @@ async def complete_conversation(
                 )
             except Exception as e:
                 # Add error response for failed tool calls
-                logger.error(f"Error executing {str(e)}")
+                import traceback
+
+                logger.error(f"Error executing tool call: {traceback.format_exc()}")
                 tools_responses.append(
                     {
                         "role": "tool",
@@ -263,7 +265,7 @@ async def get_completion(conversation: Conversation) -> None:
             "type": "function",
             "function": {
                 "name": "stake_sonic",
-                "description": "Builds a transaction to stake SONIC.",
+                "description": "Builds a transaction to stake Sonic chains native token `S`.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -338,7 +340,7 @@ async def get_completion(conversation: Conversation) -> None:
                     )
 
             except (json.JSONDecodeError, KeyError) as e:
-                logger.error(f"Failed to parse tool call from content: {e}")
+                logger.exception(f"Failed to parse tool call from content: {e}")
                 if attempt < max_retries - 1:
                     continue
                 else:
