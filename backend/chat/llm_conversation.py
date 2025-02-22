@@ -370,11 +370,13 @@ async def submit_signed_transaction(
         raise ValueError("Multiple pending transactions found for conversation")
 
     transaction_request.transaction_details = None
+    content = None
     if transaction_request.flow == TransactionFlows.SWAP:
         from chat.swap_transactions import process_swap_transaction
 
         if transaction_request.step == SwapTransactionSteps.BUILD_SWAP_TX:
             transaction_request.state = TransactionStates.COMPLETED
+            content = f"Swap has been completed and verified on the blockchain. Let the user know the same."
             transaction_request.step += 1
         else:
             await process_swap_transaction(transaction_request)
@@ -383,6 +385,7 @@ async def submit_signed_transaction(
 
         if transaction_request.step == SiloLendingDepositTxnSteps.DEPOSIT:
             transaction_request.state = TransactionStates.COMPLETED
+            content = f"Lending transaction has been completed and verified on the blockchain. Let the user know the same."
             transaction_request.step += 1
         else:
             await process_lend_transaction(transaction_request)
@@ -391,6 +394,7 @@ async def submit_signed_transaction(
 
         if transaction_request.step == SiloLendingWithdrawTxnSteps.WITHDRAW:
             transaction_request.state = TransactionStates.COMPLETED
+            content = f"Withdrawal transaction has been completed and verified on the blockchain. Let the user know the same."
             transaction_request.step += 1
         else:
             await process_withdraw_transaction(transaction_request)
@@ -399,6 +403,7 @@ async def submit_signed_transaction(
 
         if transaction_request.step == SonicStakeTxnSteps.STAKE:
             transaction_request.state = TransactionStates.COMPLETED
+            content = f"Staking transaction has been completed and verified on the blockchain. Let the user know the same."
             transaction_request.step += 1
         else:
             await process_stake_sonic_transaction(transaction_request)
@@ -406,17 +411,7 @@ async def submit_signed_transaction(
         raise ValueError("Unexpected transaction flow")
 
     if transaction_request.state == TransactionStates.COMPLETED:
-        # Add the transaction result to the conversation
-        if transaction_request.flow == TransactionFlows.SWAP:
-            content = f"Swap has been completed and verified on the blockchain. Let the user know the same."
-        elif transaction_request.flow == TransactionFlows.SILO_LENDING_DEPOSIT:
-            content = f"Lending transaction has been completed and verified on the blockchain. Let the user know the same."
-        elif transaction_request.flow == TransactionFlows.SILO_LENDING_WITHDRAW:
-            content = f"Withdrawal transaction has been completed and verified on the blockchain. Let the user know the same."
-        elif transaction_request.flow == TransactionFlows.STAKE_SONIC:
-            content = f"Staking transaction has been completed and verified on the blockchain. Let the user know the same."
-        else:
-            raise ValueError("Unexpected transaction flow")
+        assert content is not None, "Content must be set for completed transactions"
 
         tools_responses = [
             {
@@ -425,6 +420,10 @@ async def submit_signed_transaction(
                 "name": conversation.messages[-1]["tool_calls"][0]["function"]["name"],
                 "content": content,
             }
+        ]
+        transaction_request.signed_tx_hash = signed_tx_hash
+        transaction_request.tool_call_id = conversation.messages[-1]["tool_calls"][0][
+            "id"
         ]
         conversation.messages.extend(tools_responses)
 

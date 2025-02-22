@@ -43,6 +43,8 @@ class TransactionRequests(AppModel):
     updated_at = models.DateTimeField(auto_now=True)
     failed_reason = models.CharField(max_length=255, null=True)
     transaction_details = models.JSONField(null=True)
+    tool_call_id = models.CharField(max_length=255, null=True)
+    signed_tx_hash = models.CharField(max_length=255, null=True)
 
     def __str__(self):
         return f"TransactionRequest {self.id}"
