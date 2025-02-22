@@ -213,3 +213,7 @@ def money_approx_dv(value: Optional[float]) -> Optional[DisplayValue_]:
             approximate_values=False,
         ),
     )
+
+
+def abbreviate_evm_address(address: str) -> str:
+    return address[:6] + "..." + address[-4:]

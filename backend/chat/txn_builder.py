@@ -1,5 +1,6 @@
 from typing import Dict
 
+from tools.display import abbreviate_evm_address
 from chaindata.evm.constants import ABI
 from chaindata.evm.utils import get_w3
 from chaindata.evm.token_lists import get_token_addresses_from_symbols
@@ -91,5 +92,5 @@ async def build_allowance_transaction(
 
     return {
         "transaction": txn,
-        "description": f"Approving {spender_address} to spend {token_symbol} for lending",
+        "description": f"Approving {abbreviate_evm_address(spender_address)} to spend {token_symbol}",
     }
