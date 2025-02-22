@@ -81,6 +81,11 @@ async def get_user_token_balances(
     # Handle token balances (all except the last response which is native balance)
     for token_address, resp in zip(token_addresses, responses[:-1]):
         resp_json = resp["result"]
+
+        if resp_json == "0x":
+            balances[token_address] = 0
+            continue
+
         if resp_json is None:
             raise ValueError(f"No balance found for token {token_address}")
 
