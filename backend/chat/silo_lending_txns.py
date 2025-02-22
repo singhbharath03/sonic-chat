@@ -269,7 +269,7 @@ async def handle_lend_step(
                 "options": options,
             }
         ],
-    ).build_transaction({"from": user_address})
+    ).build_transaction({"from": user_address, "gas": 500000})
 
     transaction_details = {
         "transaction": txn,
@@ -365,6 +365,9 @@ async def get_silo_markets():
 
 
 async def get_best_lending_vault(token_address: str):
+    if token_address == SONIC_NATIVE_TOKEN_PLACEHOLDER_ADDRESS:
+        return await get_best_lending_vault(WRAPPED_SONIC_ADDRESS)
+
     markets = await get_silo_markets()
 
     config_address = None
