@@ -7,7 +7,7 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
-from chat.silo_lending_txns import lend_tokens
+from chat.silo_lending_txns import lend_tokens, withdraw_tokens
 from chat.swap_transactions import swap_tokens
 from chat.typing import (
     SiloLendingDepositTxnSteps,
@@ -47,7 +47,7 @@ Steps to onboard a user:
 
 Supported actions:
 - Swap tokens
-- Lend tokens
+- Lend, withdraw tokens
 """
 
 NEW_THREAD_START_MESSAGES = [
@@ -94,6 +94,15 @@ async def complete_conversation(
 
                 elif function_name == "lend_tokens":
                     result = await lend_tokens(
+                        conversation,
+                        user_details.evm_wallet_address,
+                        fn_args["token_symbol"],
+                        fn_args["amount"],
+                    )
+
+                    return True
+                elif function_name == "withdraw_tokens":
+                    result = await withdraw_tokens(
                         conversation,
                         user_details.evm_wallet_address,
                         fn_args["token_symbol"],
@@ -170,6 +179,25 @@ async def get_completion(conversation: Conversation) -> None:
                 "returns": {
                     "type": "object",
                     "description": "Lending transaction details",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "withdraw_tokens",
+                "description": "Builds a transaction to withdraw tokens.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "token_symbol": {"type": "string"},
+                        "amount": {"type": "number"},
+                    },
+                    "required": ["token_symbol", "amount"],
+                },
+                "returns": {
+                    "type": "object",
+                    "description": "Withdrawal transaction details",
                 },
             },
         },

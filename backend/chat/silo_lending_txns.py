@@ -255,8 +255,13 @@ async def handle_withdraw_step(
     amount_in_wei = int(amount * 10**token_decimals)
 
     txn = await contract.functions.redeem(
-        amount_in_wei, token_address
-    ).build_transaction({"from": user_address})
+        amount_in_wei, user_address, user_address
+    ).build_transaction(
+        {
+            "from": user_address,
+            "gas": 350000,  # Set a higher minimum gas limit with ~40% buffer
+        }
+    )
 
     transaction_details = {
         "transaction": txn,
