@@ -31,7 +31,7 @@ async def get_token_metadata(token_addresses: List[str]) -> Dict[str, TokenMetad
 def get_sonic_token_metadata():
     return TokenMetadata_(
         name="Sonic",
-        symbol="SONIC",
+        symbol="S",
         decimals=18,
         logo_url="https://sonicscan.org/token/images/s-token.svg",
     )
