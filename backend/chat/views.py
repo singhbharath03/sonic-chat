@@ -14,8 +14,9 @@ from chat.typing import (
     TransactionStates,
 )
 from chat.llm_conversation import (
-    NEW_THREAD_START_MESSAGES,
+    SYSTEM_PROMPT,
     complete_conversation,
+    is_user_wallet_funded,
     submit_signed_transaction,
 )
 from fastapi import APIRouter, Request, HTTPException
@@ -46,8 +47,25 @@ async def process_message(
 
 @router.get("/new_thread", response_model=ConversationResponse_)
 async def new_thread(request: Request, privy_user_id: str) -> ConversationResponse_:
+    user_details = await get_user_profile(privy_user_id)
+    is_wallet_funded = await is_user_wallet_funded(user_details)
+    if not is_wallet_funded:
+        assistant_message = "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Base or Sonic chain."
+    else:
+        assistant_message = "Hello! I'm here to help you explore Sonic Chain."
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT,
+        },
+        {
+            "role": "assistant",
+            "content": assistant_message,
+        },
+    ]
     conversation = await Conversation.objects.acreate(
-        user_id=privy_user_id, messages=NEW_THREAD_START_MESSAGES
+        user_id=privy_user_id, messages=messages
     )
 
     return ConversationResponse_(

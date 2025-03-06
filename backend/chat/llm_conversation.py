@@ -53,17 +53,6 @@ Supported actions:
 - Stake Sonic native token `S`
 """
 
-NEW_THREAD_START_MESSAGES = [
-    {
-        "role": "system",
-        "content": SYSTEM_PROMPT,
-    },
-    {
-        "role": "assistant",
-        "content": "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Base or Sonic chain.",
-    },
-]
-
 
 async def complete_conversation(
     conversation: Conversation,
