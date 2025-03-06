@@ -7,6 +7,7 @@ from groq import AsyncGroq
 from django.db import transaction
 from asgiref.sync import sync_to_async
 
+from chat.sonic_airdrop import get_points_and_gems_details
 from chat.stake_sonic_txn import stake_sonic
 from chat.silo_lending_txns import lend_tokens, withdraw_all_tokens, withdraw_tokens
 from chat.swap_transactions import swap_tokens
@@ -116,7 +117,8 @@ async def complete_conversation(
                         fn_args["amount"],
                     )
                     return True
-
+                elif function_name == "get_points_and_gems_details":
+                    result = get_points_and_gems_details()
                 elif function_name == "bridge_assets":
                     result = (
                         "Assets bridged successfully"  # Implement actual bridging logic
@@ -168,6 +170,18 @@ async def get_completion(conversation: Conversation) -> None:
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "List of funded chains",
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_points_and_gems_details",
+                "description": "Get details about the points and gems program on Sonic chain.",
+                "parameters": {},
+                "returns": {
+                    "type": "string",
+                    "description": "Details about the points and gems program",
                 },
             },
         },
