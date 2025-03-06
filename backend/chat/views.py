@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/process_messages/")
+@router.post("/process_messages")
 async def process_message(
     request: ProcessMessageRequest_, privy_user_id: str
 ) -> ConversationResponse_:
@@ -44,7 +44,7 @@ async def process_message(
     )
 
 
-@router.get("/new_thread/", response_model=ConversationResponse_)
+@router.get("/new_thread", response_model=ConversationResponse_)
 async def new_thread(request: Request, privy_user_id: str) -> ConversationResponse_:
     conversation = await Conversation.objects.acreate(
         user_id=privy_user_id, messages=NEW_THREAD_START_MESSAGES
