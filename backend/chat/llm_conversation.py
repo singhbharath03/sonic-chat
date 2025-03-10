@@ -42,16 +42,11 @@ Some details about the chain:
 - It is the defi powerhouse with yields upto 30% on stables.
 - There is an airdrop worth 200M Sonic. The first season becomes claimable around June 2025, good time to farm!
 
-Steps to onboard a user:
-1. Ask user to fund their wallet with natives on Solana or Sonic chain.
-2. verify that the user has funded their wallet. 
-3. Let the user know the chains they have funded.
-4. If any chain other than Sonic was funded, bridge those assets to Sonic chain. 
-
 Supported actions:
 - Swap tokens
 - Lend, withdraw tokens
 - Stake Sonic native token `S`
+- get details about the Sonic airdrop - points and gems
 """
 
 

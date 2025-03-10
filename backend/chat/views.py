@@ -52,7 +52,13 @@ async def new_thread(request: Request, privy_user_id: str) -> ConversationRespon
     if not is_wallet_funded:
         assistant_message = "Hello! I'm here to help you get started on Sonic Chain. Let's get you set up. Please fund your wallet with natives on Base or Sonic chain."
     else:
-        assistant_message = "Hello! I'm here to help you explore Sonic Chain."
+        assistant_message = """
+Hello! I can help you with the following to explore Sonic chain:
+- Swap tokens
+- Lend, withdraw tokens at the best yield
+- Stake Sonic native token S
+- get details about the airdrop
+        """
 
     messages = [
         {
