@@ -114,10 +114,6 @@ async def complete_conversation(
                     return True
                 elif function_name == "get_points_and_gems_details":
                     result = get_points_and_gems_details()
-                elif function_name == "bridge_assets":
-                    result = (
-                        "Assets bridged successfully"  # Implement actual bridging logic
-                    )
                 else:
                     result = f"Error: Unknown function '{function_name}'"
 
@@ -276,15 +272,6 @@ async def get_completion(conversation: Conversation) -> None:
                     "type": "object",
                     "description": "Staking transaction details",
                 },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "bridge_assets",
-                "description": "Bridge assets from any chain to Sonic chain.",
-                "parameters": {},
-                "returns": "string",
             },
         },
     ]
