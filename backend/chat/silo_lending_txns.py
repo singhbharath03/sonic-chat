@@ -184,7 +184,6 @@ async def process_lend_transaction(transaction_request: TransactionRequests) -> 
     if transaction_request.step < SiloLendingDepositTxnSteps.APPROVAL:
         needs_txn_signing = await handle_approval_step(
             transaction_request,
-            lending_vault,
             token_address,
             token_symbol,
             user_address,
@@ -212,7 +211,6 @@ async def process_lend_transaction(transaction_request: TransactionRequests) -> 
 
 async def handle_approval_step(
     transaction_request: TransactionRequests,
-    lending_vault: str,
     token_address: str,
     token_symbol: str,
     user_address: str,
@@ -225,7 +223,7 @@ async def handle_approval_step(
     transaction_details = await check_and_build_allowance(
         token_address,
         user_address,
-        lending_vault,
+        SILO_ROUTER_V2_ADDRESS,
         amount,
         token_decimals,
         token_symbol,
